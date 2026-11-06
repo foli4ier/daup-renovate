@@ -1,5 +1,5 @@
 import { zonesOnPhase, phaseName } from "../data/phases";
-import { linesForZone, totalRange, type MoneyLine } from "../lib/budget";
+import { assessTotal, linesForZone, type MoneyLine, type TotalReport } from "../lib/budget";
 import { buildZoneScope } from "../lib/scope";
 import { nextStep, pillOf, type LinkSnap, type NextStep, type Pill } from "../lib/status";
 import type { Photo, Plan, PlanLink, Property, Proposal, State, Zone } from "./types";
@@ -18,7 +18,13 @@ export function activePlan(state: State): Plan | undefined {
 }
 
 export function propertyZones(state: State, propertyId: string): Zone[] {
-  return state.zones.filter((zone) => zone.propertyId === propertyId).slice().sort((a, b) => a.order - b.order);
+  return state.zones
+    .filter((zone) => zone.propertyId === propertyId)
+    .slice()
+    .sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === "outside" ? -1 : 1;
+      return a.order - b.order;
+    });
 }
 
 export function photosFor(state: State, zoneId: string): Photo[] {
@@ -68,6 +74,7 @@ export function planNext(state: State): NextStep {
     name: zone.name,
     hidden: zone.hidden,
     order: zone.order,
+    kind: zone.kind,
     beforeCount: photosFor(state, zone.id).length,
     link: linkFor(state, plan.id, zone.id) ?? emptyLink,
   }));
@@ -98,8 +105,8 @@ export function budgetLines(state: State, plan: Plan): { zone: Zone; lines: Mone
   }));
 }
 
-export function budgetTotal(groups: { lines: MoneyLine[] }[]) {
-  return totalRange(groups.flatMap((group) => group.lines));
+export function budgetReport(groups: { lines: MoneyLine[] }[]): TotalReport {
+  return assessTotal(groups.flatMap((group) => group.lines));
 }
 
 export function scopeFor(state: State, plan: Plan, zone: Zone): string {

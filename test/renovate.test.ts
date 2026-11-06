@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { copy } from "../src/copy.ts";
 import { seed } from "../src/data/seed.ts";
-import { linesForZone, totalRange } from "../src/lib/budget.ts";
+import { propertyZones } from "../src/state/select.ts";
+import { answersForSkip } from "../src/data/questions.ts";
+import { assessTotal, linesForZone } from "../src/lib/budget.ts";
 import { findLeak } from "../src/lib/leak.ts";
 import { buildEditPrompt } from "../src/lib/prompt.ts";
 import { buildZoneScope } from "../src/lib/scope.ts";
@@ -16,6 +18,7 @@ describe("callout leak check", () => {
     assert.equal(findLeak("Keep the low border and the roof line."), null);
     assert.equal(findLeak("House number 17 stays."), null);
     assert.equal(findLeak("R250"), "amount");
+    assert.equal(findLeak("R  250"), "amount");
     assert.equal(findLeak("about R 1,500 for paint"), "amount");
     assert.equal(findLeak("250–450"), "range");
     assert.equal(findLeak("250-450"), "range");
@@ -67,31 +70,48 @@ describe("image prompt", () => {
 });
 
 describe("estimate", () => {
-  it("leaves per-m² lines out of the total until there is a size", () => {
+  it("withholds the plan total while a size is missing", () => {
     const lines = [
       ...linesForZone({ key: "living" }),
       ...linesForZone({ key: "kitchen" }),
       ...linesForZone({ key: "front" }),
     ];
-    const total = totalRange(lines);
-    assert.deepEqual(total, { low: 1500 + 45000, high: 6000 + 150000 });
-    assert.equal(lines.some((line) => line.needsSize), true);
-    assert.equal(lines.some((line) => line.quoteOnly), true);
+    const report = assessTotal(lines);
+    assert.equal(report.ready, false);
+    assert.ok(report.needsSize > 0);
+    assert.ok(report.quoteOnly > 0);
   });
 
-  it("uses the size once the owner adds it", () => {
-    const lines = linesForZone({ key: "living", sizeM2: 10 });
-    const total = totalRange(lines);
-    assert.deepEqual(total, {
-      low: 30 * 10 + 250 * 10 + 1500,
-      high: 60 * 10 + 450 * 10 + 6000,
-    });
+  it("adds up only after every sized line has a size, and leaves quote-only out", () => {
+    const lines = [
+      ...linesForZone({ key: "living", sizeM2: 10 }),
+      ...linesForZone({ key: "kitchen" }),
+      ...linesForZone({ key: "front", sizeM2: 20 }),
+    ];
+    const report = assessTotal(lines);
+    assert.equal(report.ready, true);
+    assert.equal(report.quoteOnly, 1);
+    assert.equal(report.low, 30 * 10 + 250 * 10 + 1500 + 45000 + 40 * 20);
+    assert.equal(report.high, 60 * 10 + 450 * 10 + 6000 + 150000 + 100 * 20);
   });
 
   it("does not use the small-bathroom guide above 5 m²", () => {
     const lines = linesForZone({ key: "bath", sizeM2: 8 });
     assert.equal(lines[0]?.quoteOnly, true);
-    assert.equal(totalRange(lines), null);
+    assert.equal(assessTotal(lines).ready, false);
+  });
+});
+
+describe("questions", () => {
+  it("keeps answers already given and guesses only blanks", () => {
+    const answers = answersForSkip(
+      "back",
+      [{ id: "ground" }, { id: "wall" }],
+      [{ questionId: "ground", text: "Concrete." }],
+      null,
+    );
+    assert.equal(answers[0]?.text, "Concrete.");
+    assert.equal(answers[1]?.text, "Repaint it.");
   });
 });
 
@@ -151,6 +171,23 @@ describe("zone changes", () => {
     assert.equal(next.photos.filter((photo) => photo.zoneId === "zone_kitchen").length, 2);
   });
 
+  it("keeps outside zones first after a kind change", () => {
+    const state = seed();
+    const changed = reduce(state, { type: "set-zone-kind", zoneId: "zone_sun", kind: "outside" });
+    const names = propertyZones(changed, "prop_esseboom")
+      .filter((zone) => !zone.hidden)
+      .map((zone) => zone.name);
+    assert.deepEqual(names.slice(0, 4), ["Front yard", "Back yard", "Side yard", "Sun room (stoep)"]);
+  });
+
+  it("pairs the kitchen proposal with the starred cabinet wall", () => {
+    const state = seed();
+    const proposal = state.proposals.find((item) => item.zoneId === "zone_kitchen");
+    const starred = state.photos.find((photo) => photo.zoneId === "zone_kitchen" && photo.starred);
+    assert.equal(proposal?.beforePhotoId, starred?.id);
+    assert.equal(starred?.sourceName, "Kombuis__kitchen_3.jpeg");
+  });
+
   it("does not count a failed picture toward the cap", () => {
     const state = seed();
     const before = state.links.find((link) => link.zoneId === "zone_front");
@@ -179,11 +216,21 @@ describe("owner copy", () => {
     copy.openProperty,
     copy.done,
     copy.back,
+    copy.tryAgain,
+    "Budget refresh.",
+    "Modern.",
+    "Keep character.",
+    "Low.",
+    "Mid.",
+    "High.",
   ];
   it("ends buttons with a full stop", () => {
     for (const label of buttons) assert.match(label, /\.$/);
   });
   it("never says CAPEX", () => {
     assert.equal(JSON.stringify(copy).toLowerCase().includes("capex"), false);
+  });
+  it("uses the locked impression line", () => {
+    assert.equal(copy.impression, "After-images are AI impressions, not designs; proportions and details may differ.");
   });
 });

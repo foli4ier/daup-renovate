@@ -6,7 +6,7 @@ import { ActionBar, TopBar } from "../components/Chrome";
 import { formatRand, formatRange } from "../lib/money";
 import { rateGuide, tierTotal, type MoneyLine } from "../lib/budget";
 import type { Tier } from "../lib/prompt";
-import { activePlan, budgetLines, budgetTotal, proposalsFor } from "../state/select";
+import { activePlan, budgetLines, budgetReport, proposalsFor } from "../state/select";
 import { useRenovate } from "../state/store";
 
 function Line({ line, tier }: { line: MoneyLine; tier: Tier }) {
@@ -24,7 +24,7 @@ function Line({ line, tier }: { line: MoneyLine; tier: Tier }) {
           {line.label} · {formatRange(line.low, line.high)} {line.per}
         </p>
         <p>
-          <Link to="/plan?edit=1">{copy.addSize}</Link>
+          <Link className="text-btn" to="/plan?edit=1">{copy.addSize}</Link>
         </p>
       </div>
     );
@@ -60,21 +60,38 @@ export default function Budget() {
     );
   }
   const groups = budgetLines(state, plan);
-  const total = budgetTotal(groups);
-  const mid = tierTotal(
-    groups.flatMap((group) => group.lines),
-    tier,
-  );
+  const report = budgetReport(groups);
+  const mid = report.ready
+    ? tierTotal(
+        groups.flatMap((group) => group.lines),
+        tier,
+      )
+    : null;
 
   return (
-    <div className={`page ${groups.length ? "has-action" : ""}`}>
+    <div className="page has-action">
       <TopBar title="Estimate" />
       <p className="banner">{copy.bannerEstimate}</p>
       {groups.length === 0 ? (
-        <p style={{ marginTop: 16 }}>{copy.approveFirst}</p>
+        <>
+          <p style={{ marginTop: 16 }}>{copy.approveFirst}</p>
+          <div className="action-bar">
+            <Link className="btn btn-primary btn-wide" to="/plan">
+              {copy.toZones}
+            </Link>
+          </div>
+        </>
       ) : (
         <>
-          <p className="total">{total ? formatRange(total.low, total.high) : copy.addSize}</p>
+          {report.ready ? (
+            <p className="total">{formatRange(report.low, report.high)}</p>
+          ) : (
+            <>
+              <p className="meta" style={{ marginTop: 12 }}>{copy.sizeFirst}</p>
+              <Link className="text-btn" to="/plan?edit=1">{copy.addSize}</Link>
+            </>
+          )}
+          {report.quoteOnly > 0 ? <p className="meta">{copy.quoteOutside}</p> : null}
           <div className="tier-row" role="group" aria-label="Low, mid, or high">
             {(["low", "mid", "high"] as const).map((item) => (
               <button key={item} type="button" className="tier" aria-pressed={tier === item} onClick={() => setTier(item)}>

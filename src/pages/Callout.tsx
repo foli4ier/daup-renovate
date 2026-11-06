@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { copy } from "../copy";
 import { TopBar } from "../components/Chrome";
-import { findLeak } from "../lib/leak";
+import { findLeak, leakPhrase, locateLeak } from "../lib/leak";
 import { activePlan, approvedVisible, proposalsFor, scopeFor } from "../state/select";
 import { useRenovate } from "../state/store";
 
@@ -12,7 +13,7 @@ export default function Callout() {
   const [step, setStep] = useState<"choose" | "preview">("choose");
   const [hint, setHint] = useState("");
   const [sent, setSent] = useState(false);
-  const [blocked, setBlocked] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   if (!plan) {
     return (
@@ -96,11 +97,28 @@ export default function Callout() {
               const picture = proposalsFor(state, plan.id, zone.id).find((item) => item.id === link?.approvedProposalId);
               const before = picture ? state.photos.find((photo) => photo.id === picture.beforePhotoId) : undefined;
               const scope = scopeFor(state, plan, zone);
-              const leak = findLeak(scope);
+              const spot = link
+                ? locateLeak({
+                    keep: link.keep,
+                    replace: link.replace,
+                    answers: zone.answers.map((answer) => answer.text),
+                    styleNote: link.styleNote,
+                  })
+                : null;
               return (
                 <article key={zone.id} className="card">
                   <h3>{zone.name}</h3>
-                  {leak ? <p className="warn">{copy.leakBlock}</p> : <p>{scope}</p>}
+                  {spot ? (
+                    <>
+                      <p className="warn">{leakPhrase(spot)}</p>
+                      <p className="meta">Change it, then preview again.</p>
+                      <Link className="text-btn" to={`/zone/${zone.id}`}>
+                        Change {zone.name}.
+                      </Link>
+                    </>
+                  ) : (
+                    <p>{scope}</p>
+                  )}
                   <div className="pair" style={{ marginTop: 10 }}>
                     {before ? (
                       <figure>
@@ -120,7 +138,7 @@ export default function Callout() {
             })}
           </div>
           <p className="meta">{copy.workshop}</p>
-          {blocked ? <p className="warn">{copy.leakBlock}</p> : null}
+          {failed ? <p className="warn">{copy.nothingSent}</p> : null}
           {sent ? <p className="banner" style={{ marginTop: 12 }}>{copy.sent}</p> : null}
           <div className="action-bar">
             <button
@@ -128,15 +146,17 @@ export default function Callout() {
               type="button"
               disabled={sent || chosen.some((zone) => findLeak(scopeFor(state, plan, zone)) !== null)}
               onClick={() => {
+                setFailed(false);
                 void sendCallouts(chosen.map((zone) => zone.id)).then((result) => {
                   if (result.blocked) {
-                    setBlocked(true);
+                    setSent(false);
                     return;
                   }
                   if (result.ok) {
                     setSent(true);
-                    setBlocked(false);
+                    return;
                   }
+                  setFailed(true);
                 });
               }}
             >

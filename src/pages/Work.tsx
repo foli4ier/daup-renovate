@@ -1,16 +1,18 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { copy } from "../copy";
 import { ActionBar, TopBar } from "../components/Chrome";
 import { PushSheet } from "../components/ProjectSheets";
-import { activePlan, phaseRows, zonesSettled } from "../state/select";
+import { activePlan, phaseRows, planNext, stepHref, zonesSettled } from "../state/select";
 import { useRenovate } from "../state/store";
 
 export default function Work() {
   const { state, dispatch } = useRenovate();
   const plan = activePlan(state);
+  const navigate = useNavigate();
   const [editing, setEditing] = useState<string | null>(null);
   const [push, setPush] = useState(false);
-  const timer = useRef<number | null>(null);
+  const next = planNext(state);
 
   if (!plan) {
     return (
@@ -23,7 +25,8 @@ export default function Work() {
 
   const rows = phaseRows(state, plan);
   const ready = zonesSettled(state, plan) && rows.some((row) => row.zoneNames.length > 0);
-  const label = plan.status === "draft" ? copy.approvePlan : copy.push;
+  const inProject = plan.status === "in-project" || plan.status === "done";
+  const label = inProject ? next.label : plan.status === "draft" ? copy.approvePlan : copy.push;
 
   return (
     <div className={`page ${push ? "" : "has-action"}`}>
@@ -35,16 +38,6 @@ export default function Work() {
           <article
             key={row.phase.id}
             className="card phase"
-            onPointerDown={() => {
-              if (plan.status !== "draft") return;
-              timer.current = window.setTimeout(() => setEditing(row.phase.id), 450);
-            }}
-            onPointerUp={() => {
-              if (timer.current) window.clearTimeout(timer.current);
-            }}
-            onPointerLeave={() => {
-              if (timer.current) window.clearTimeout(timer.current);
-            }}
           >
             <div className="phase-no">{row.index}</div>
             <div>
@@ -53,19 +46,24 @@ export default function Work() {
               <p className="meta">{copy.aboutDays(row.phase.days)}</p>
               <p className="meta">{copy.startsAfter(row.starts)}</p>
               {row.phase.alongside ? <p className="meta">{row.phase.alongside}</p> : null}
-              {editing === row.phase.id && plan.status === "draft" ? (
+              {!inProject ? (
+                <button className="text-btn" type="button" onClick={() => setEditing(editing === row.phase.id ? null : row.phase.id)}>
+                  {copy.changePhase}
+                </button>
+              ) : null}
+              {editing === row.phase.id && !inProject ? (
                 <div className="row" style={{ marginTop: 8 }}>
                   <button className="icon-btn" type="button" onClick={() => dispatch({ type: "move-phase", planId: plan.id, phaseId: row.phase.id, direction: "up" })}>
-                    Up.
+                    {copy.moveUp}
                   </button>
                   <button className="icon-btn" type="button" onClick={() => dispatch({ type: "move-phase", planId: plan.id, phaseId: row.phase.id, direction: "down" })}>
-                    Down.
+                    {copy.moveDown}
                   </button>
-                  <button className="icon-btn" type="button" onClick={() => dispatch({ type: "set-phase-days", planId: plan.id, phaseId: row.phase.id, days: row.phase.days - 1 })}>
-                    −
+                  <button className="icon-btn" type="button" aria-label={copy.fewerDays} onClick={() => dispatch({ type: "set-phase-days", planId: plan.id, phaseId: row.phase.id, days: row.phase.days - 1 })}>
+                    {copy.fewerDays}
                   </button>
-                  <button className="icon-btn" type="button" onClick={() => dispatch({ type: "set-phase-days", planId: plan.id, phaseId: row.phase.id, days: row.phase.days + 1 })}>
-                    +
+                  <button className="icon-btn" type="button" aria-label={copy.moreDays} onClick={() => dispatch({ type: "set-phase-days", planId: plan.id, phaseId: row.phase.id, days: row.phase.days + 1 })}>
+                    {copy.moreDays}
                   </button>
                 </div>
               ) : null}
@@ -81,6 +79,12 @@ export default function Work() {
             type="button"
             disabled={plan.status === "draft" && !ready}
             onClick={() => {
+              if (inProject) {
+                const href = stepHref(next);
+                if (href) navigate(href);
+                else if (plan.projectUrl) window.open(plan.projectUrl, "_blank", "noopener,noreferrer");
+                return;
+              }
               if (plan.status === "draft") {
                 dispatch({ type: "approve-plan", planId: plan.id });
                 setPush(true);

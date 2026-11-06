@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { copy } from "../copy";
 import { styleLabel, tierLabel } from "../data/guides";
-import { BeforeAfter, TopBar } from "../components/Chrome";
+import { ActionBar, BeforeAfter, Sheet, TopBar } from "../components/Chrome";
+import { PushSheet } from "../components/ProjectSheets";
 import { triesLeft } from "../lib/prompt";
 import { activePlan, linkFor, photosFor, planNext, proposalsFor, stepHref, visibleZones, zonePill } from "../state/select";
 import { useRenovate } from "../state/store";
-import { Sheet } from "../components/Chrome";
 
 export default function Gallery() {
   const { zoneId = "" } = useParams();
@@ -17,7 +17,8 @@ export default function Gallery() {
   const [activeId, setActiveId] = useState(zoneId);
   const [selected, setSelected] = useState<string | null>(null);
   const [driftOpen, setDriftOpen] = useState(false);
-  const [driftNote, setDriftNote] = useState("");
+  const [keepDraft, setKeepDraft] = useState("");
+  const [pushOpen, setPushOpen] = useState(false);
   const slides = plan ? visibleZones(state, plan.propertyId).filter((zone) => proposalsFor(state, plan.id, zone.id).length > 0 || zone.id === zoneId) : [];
 
   useEffect(() => {
@@ -57,16 +58,41 @@ export default function Gallery() {
     }
   }
 
-  async function retry(note?: string) {
+  function follow(step: typeof next) {
+    if (step.kind === "push") {
+      setPushOpen(true);
+      return;
+    }
+    if (step.kind === "project" && currentPlan.projectUrl) {
+      window.open(currentPlan.projectUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+    const href = stepHref(step);
+    if (href) navigate(href);
+  }
+
+  async function retry(drift: boolean) {
     if (!zone || !link || left === 0) return;
-    if (note) dispatch({ type: "add-keep", planId: currentPlan.id, zoneId: zone.id, text: note });
+    if (drift) {
+      const keep = keepDraft.split("\n").map((line) => line.trim()).filter(Boolean);
+      dispatch({
+        type: "set-guides",
+        planId: currentPlan.id,
+        zoneId: zone.id,
+        style: link.style,
+        styleNote: link.styleNote,
+        budget: link.budget,
+        keep,
+        replace: link.replace,
+      });
+    }
     setDriftOpen(false);
-    const result = await generate(zone.id, { drift: Boolean(note) });
+    const result = await generate(zone.id, { drift });
     if (result.ok) setSelected(null);
   }
 
   return (
-    <div className={`page ${driftOpen ? "" : "has-stack"}`}>
+    <div className={`page ${driftOpen || pushOpen ? "" : "has-action"}`}>
       <TopBar title={zone?.name} />
       <div className="snap" ref={scroller} onScroll={onScroll}>
         {slides.map((slide) => {
@@ -118,34 +144,28 @@ export default function Gallery() {
           ))}
         </div>
       ) : null}
+      <p className="meta impression">{copy.impression}</p>
       {link?.lastFailed ? <p className="warn" style={{ marginTop: 10 }}>{copy.failure}</p> : null}
       {busyZoneId === zone?.id ? <p className="meta">{copy.making}</p> : null}
-
-      {driftOpen || !zone || !link ? null : (
-        <div className="action-stack">
-          <p className="meta impression">{copy.impression}</p>
-          <button className="text-btn" type="button" onClick={() => setDriftOpen(true)} disabled={left === 0}>
-            {copy.drift}
-          </button>
+      {zone && link ? (
+        <>
           <button
-            className="btn btn-primary btn-wide"
+            className="text-btn"
             type="button"
-            disabled={!current}
+            disabled={left === 0}
             onClick={() => {
-              if (!current) return;
-              if (zonePill(state, plan.id, zone) === "approved" && link.approvedProposalId === current.id) {
-                const href = stepHref(next);
-                if (href) navigate(href);
-                return;
-              }
-              dispatch({ type: "approve", planId: plan.id, zoneId: zone.id, proposalId: current.id });
+              setKeepDraft(link.keep.join("\n"));
+              setDriftOpen(true);
             }}
           >
-            {current && link.approvedProposalId === current.id ? next.label : copy.approve}
+            {copy.drift}
           </button>
-          <button className="btn btn-outline btn-wide" type="button" disabled={left === 0 || busyZoneId === zone.id} onClick={() => void retry()}>
-            {copy.tryAgain(left)}
-          </button>
+          <div className="try-row">
+            <button className="btn btn-outline" type="button" disabled={left === 0 || busyZoneId === zone.id} onClick={() => void retry(false)}>
+              {copy.tryAgain}
+            </button>
+            <span className="meta">{copy.triesLeft(left)}</span>
+          </div>
           <button
             className="text-btn"
             type="button"
@@ -156,31 +176,50 @@ export default function Gallery() {
           >
             {copy.skipZone}
           </button>
-        </div>
-      )}
+        </>
+      ) : null}
 
-      {driftOpen && zone ? (
-        <Sheet title={copy.drift} onClose={() => setDriftOpen(false)}>
-          <p className="meta">It stays on the next try.</p>
-          <div className="chips" style={{ margin: "12px 0" }}>
-            {link?.keep.map((item) => (
-              <span key={item} className="choice" aria-pressed="true">{item}</span>
-            ))}
-          </div>
-          <label className="field">
-            What should stay
-            <input value={driftNote} onChange={(event) => setDriftNote(event.target.value)} />
-          </label>
+      {driftOpen || pushOpen || !zone || !link ? null : (
+        <ActionBar>
           <button
             className="btn btn-primary btn-wide"
             type="button"
-            disabled={!driftNote.trim() || left === 0}
-            onClick={() => void retry(driftNote.trim())}
+            disabled={!current && zonePill(state, plan.id, zone) !== "approved"}
+            onClick={() => {
+              if (current && link.approvedProposalId === current.id) {
+                follow(next);
+                return;
+              }
+              if (!current) return;
+              dispatch({ type: "approve", planId: plan.id, zoneId: zone.id, proposalId: current.id });
+            }}
           >
-            {copy.tryAgain(left)}
+            {current && link.approvedProposalId === current.id ? next.label : copy.approve}
           </button>
+        </ActionBar>
+      )}
+
+      {driftOpen && zone && link ? (
+        <Sheet
+          title={copy.drift}
+          onClose={() => setDriftOpen(false)}
+          footer={
+            <div className="try-row">
+              <button className="btn btn-primary" type="button" disabled={left === 0} onClick={() => void retry(true)}>
+                {copy.tryAgain}
+              </button>
+              <span className="meta">{copy.triesLeft(left)}</span>
+            </div>
+          }
+        >
+          <p className="meta">Keep is filled in for the next try.</p>
+          <label className="field">
+            Keep
+            <textarea value={keepDraft} onChange={(event) => setKeepDraft(event.target.value)} />
+          </label>
         </Sheet>
       ) : null}
+      {pushOpen ? <PushSheet onClose={() => setPushOpen(false)} /> : null}
       {before ? <span className="sr-only">{before.url}</span> : null}
     </div>
   );

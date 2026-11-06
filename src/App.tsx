@@ -1,5 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { copy } from "./copy";
 import { TabBar } from "./components/Chrome";
+import { useRenovate } from "./state/store";
 import Budget from "./pages/Budget";
 import Callout from "./pages/Callout";
 import Capture from "./pages/Capture";
@@ -12,8 +14,10 @@ import You from "./pages/You";
 import Zones from "./pages/Zones";
 
 export default function App() {
+  const { state } = useRenovate();
   return (
     <div className="shell">
+      {state.sample ? <p className="sample-banner">{copy.sampleBanner}</p> : null}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/properties" element={<Properties />} />

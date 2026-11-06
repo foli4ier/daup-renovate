@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { copy } from "../copy";
 import { ActionBar, Wordmark } from "../components/Chrome";
 import { PillView } from "../components/Chrome";
-import { ProjectSheet, PushSheet } from "../components/ProjectSheets";
+import { PushSheet } from "../components/ProjectSheets";
 import { stepHref } from "../state/select";
 import { activePlan, activeProperty, approvedCount, photosFor, planNext, propertyZones, zonePill } from "../state/select";
 import { useRenovate } from "../state/store";
@@ -20,7 +20,7 @@ export default function Zones() {
   const [peek, setPeek] = useState<string | null>(null);
   const held = useRef(false);
   const holdTimer = useRef<number | null>(null);
-  const [sheet, setSheet] = useState<"push" | "project" | null>(null);
+  const [sheet, setSheet] = useState<"push" | null>(null);
   const next = planNext(state);
 
   if (!property || !plan) {
@@ -57,8 +57,8 @@ export default function Zones() {
       setSheet("push");
       return;
     }
-    if (next.kind === "project") {
-      setSheet("project");
+    if (next.kind === "project" && currentPlan.projectUrl) {
+      window.open(currentPlan.projectUrl, "_blank", "noopener,noreferrer");
       return;
     }
     const href = stepHref(next);
@@ -152,7 +152,6 @@ export default function Zones() {
       )}
       {editing ? <EditZones onClose={() => setParams({})} /> : null}
       {sheet === "push" ? <PushSheet onClose={() => setSheet(null)} /> : null}
-      {sheet === "project" ? <ProjectSheet onClose={() => setSheet(null)} /> : null}
     </div>
   );
 }

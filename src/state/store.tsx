@@ -1,45 +1,67 @@
 import { createContext, useContext, useEffect, useReducer, useRef, useState, type ReactNode } from "react";
-import { sampleCalloutSource } from "../api/callout";
+import { calloutSource } from "../api/callout";
+import { ServiceUnreachable } from "../api/errors";
 import { generateImage } from "../api/images";
-import { sampleProjectSource } from "../api/project";
+import { projectSource } from "../api/project";
+import { propertySource } from "../api/property";
 import { freshPhases } from "../data/phases";
-import { STORAGE_KEY, seed } from "../data/seed";
-import { scopeIsClean } from "../lib/scope";
+import { emptyState, SAMPLE_SESSION_KEY, sampleRequested, seed, STORAGE_KEY } from "../data/seed";
+import { locateLeak, type LeakSpot } from "../lib/leak";
+import { assessTotal } from "../lib/budget";
 import { capReached, type StyleId, type Tier } from "../lib/prompt";
 import { reduce, type Action } from "./reducer";
-import { activePlan, activeProperty, budgetLines, budgetTotal, linkFor, photosFor, proposalsFor, scopeFor, starredPhoto } from "./select";
+import { activePlan, activeProperty, budgetLines, linkFor, photosFor, proposalsFor, scopeFor, starredPhoto } from "./select";
 import type { CalloutRequest, Photo, State, Zone, ZoneKind } from "./types";
+
+export type PropertyLoad = "loading" | "ready" | "error";
 
 type StoreValue = {
   state: State;
+  propertyLoad: PropertyLoad;
   busyZoneId: string | null;
   dispatch: (action: Action) => void;
-  reset: () => void;
+  reloadProperties: () => void;
   startPlan: (name: string) => void;
   addPhoto: (photo: Photo) => void;
   saveGuides: (zoneId: string, guides: { style?: StyleId; styleNote?: string; budget?: Tier; keep: string[]; replace: string[] }) => void;
   generate: (zoneId: string, options?: { drift?: boolean }) => Promise<{ ok: boolean }>;
-  pushProject: () => Promise<{ ok: boolean }>;
-  sendCallouts: (zoneIds: string[]) => Promise<{ ok: boolean; blocked: boolean }>;
+  pushProject: () => Promise<{ ok: true; url: string } | { ok: false }>;
+  sendCallouts: (zoneIds: string[]) => Promise<{ ok: boolean; blocked: boolean; spots: (LeakSpot & { zoneId: string; zoneName: string })[] }>;
 };
 
 const StoreContext = createContext<StoreValue | null>(null);
 
 function load(): State {
+  if (typeof window !== "undefined" && sampleRequested()) {
+    try {
+      const raw = sessionStorage.getItem(SAMPLE_SESSION_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as State;
+        if (parsed.version === 2 && parsed.sample) return parsed;
+      }
+    } catch {
+      /* start a fresh sample */
+    }
+    return seed();
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return seed();
+    if (!raw) return emptyState();
     const parsed = JSON.parse(raw) as State;
-    if (parsed.version !== 1 || !Array.isArray(parsed.zones) || !Array.isArray(parsed.plans)) return seed();
+    if (parsed.version !== 2 || parsed.sample || !Array.isArray(parsed.zones) || !Array.isArray(parsed.plans)) return emptyState();
     return parsed;
   } catch {
-    return seed();
+    return emptyState();
   }
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, rawDispatch] = useReducer(reduce, undefined, load);
   const [busyZoneId, setBusyZoneId] = useState<string | null>(null);
+  const [propertyLoad, setPropertyLoad] = useState<PropertyLoad>(
+    sampleRequested() || !import.meta.env.VITE_PROPERTY_URL ? "ready" : "loading",
+  );
+  const [reloadKey, setReloadKey] = useState(0);
   const ref = useRef(state);
   ref.current = state;
   const dispatch = (action: Action) => {
@@ -48,15 +70,43 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    if (state.sample) {
+      sessionStorage.setItem(SAMPLE_SESSION_KEY, JSON.stringify(state));
+      return;
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
+  useEffect(() => {
+    if (state.sample) return;
+    if (!import.meta.env.VITE_PROPERTY_URL) {
+      setPropertyLoad("ready");
+      return;
+    }
+    let cancel = false;
+    setPropertyLoad("loading");
+    propertySource
+      .listProperties()
+      .then((properties) => {
+        if (cancel) return;
+        dispatch({ type: "hydrate-properties", properties });
+        setPropertyLoad("ready");
+      })
+      .catch(() => {
+        if (!cancel) setPropertyLoad("error");
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [reloadKey, state.sample]);
+
   const api: StoreValue = {
       state,
+      propertyLoad,
       busyZoneId,
       dispatch,
-      reset() {
-        dispatch({ type: "replace", state: seed() });
+      reloadProperties() {
+        setReloadKey((value) => value + 1);
       },
       startPlan(name: string) {
         const property = activeProperty(ref.current);
@@ -129,9 +179,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const current = ref.current;
         const plan = activePlan(current);
         if (!plan) return { ok: false };
-        const total = budgetTotal(budgetLines(current, plan));
+        const report = assessTotal(budgetLines(current, plan).flatMap((group) => group.lines));
         try {
-          const created = await sampleProjectSource.createRenovationProject({
+          const created = await projectSource.createRenovationProject({
             propertyId: plan.propertyId,
             planId: plan.id,
             name: plan.name,
@@ -139,10 +189,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               .slice()
               .sort((a, b) => a.order - b.order)
               .map((phase) => ({ name: phase.name, days: phase.days, startsAfter: phase.startsAfter })),
-            estimate: total ? { low: total.low, high: total.high, currency: "ZAR" } : null,
+            estimate: report.ready ? { low: report.low, high: report.high, currency: "ZAR" } : null,
           });
-          dispatch({ type: "pushed", planId: plan.id, projectId: created.projectId });
-          return { ok: true };
+          dispatch({ type: "pushed", planId: plan.id, projectId: created.projectId, projectUrl: created.url });
+          return { ok: true, url: created.url };
         } catch {
           return { ok: false };
         }
@@ -150,17 +200,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       async sendCallouts(zoneIds) {
         const current = ref.current;
         const plan = activePlan(current);
-        if (!plan) return { ok: false, blocked: false };
+        if (!plan) return { ok: false, blocked: false, spots: [] };
+        const spots: (LeakSpot & { zoneId: string; zoneName: string })[] = [];
         const drafts: CalloutRequest[] = [];
         for (const zoneId of zoneIds) {
           const zone = current.zones.find((item) => item.id === zoneId);
           const link = linkFor(current, plan.id, zoneId);
           if (!zone || !link?.approvedProposalId) continue;
+          const spot = locateLeak({
+            keep: link.keep,
+            replace: link.replace,
+            answers: zone.answers.map((answer) => answer.text),
+            styleNote: link.styleNote,
+          });
+          if (spot) {
+            spots.push({ ...spot, zoneId, zoneName: zone.name });
+            continue;
+          }
           const proposal = proposalsFor(current, plan.id, zoneId).find((item) => item.id === link.approvedProposalId);
           const before = proposal ? current.photos.find((photo) => photo.id === proposal.beforePhotoId) : undefined;
           if (!proposal || !before) continue;
           const scope = scopeFor(current, plan, zone);
-          if (!scopeIsClean(scope)) return { ok: false, blocked: true };
           drafts.push({
             id: "",
             planId: plan.id,
@@ -171,11 +231,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             createdAt: new Date().toISOString(),
           });
         }
-        if (!drafts.length) return { ok: false, blocked: false };
+        if (spots.length) return { ok: false, blocked: true, spots };
+        if (!drafts.length) return { ok: false, blocked: false, spots: [] };
         try {
           const requests: CalloutRequest[] = [];
           for (const draft of drafts) {
-            const sent = await sampleCalloutSource.sendRequest({
+            const sent = await calloutSource.sendRequest({
               planId: draft.planId,
               zoneId: draft.zoneId,
               zoneName: current.zones.find((zone) => zone.id === draft.zoneId)?.name ?? "",
@@ -186,9 +247,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             requests.push({ ...draft, id: sent.requestId });
           }
           dispatch({ type: "sent", requests });
-          return { ok: true, blocked: false };
-        } catch {
-          return { ok: false, blocked: true };
+          return { ok: true, blocked: false, spots: [] };
+        } catch (error) {
+          if (error instanceof ServiceUnreachable) return { ok: false, blocked: false, spots: [] };
+          return { ok: false, blocked: false, spots: [] };
         }
       },
   };

@@ -72,6 +72,7 @@ export type Plan = {
   createdAt: string;
   phasesApproved: boolean;
   projectId?: string;
+  projectUrl?: string;
   phases: Phase[];
 };
 
@@ -86,7 +87,8 @@ export type CalloutRequest = {
 };
 
 export type State = {
-  version: 1;
+  version: 2;
+  sample: boolean;
   properties: Property[];
   zones: Zone[];
   photos: Photo[];

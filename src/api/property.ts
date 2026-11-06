@@ -10,8 +10,14 @@ export interface PropertySource {
   listProperties(): Promise<DaupProperty[]>;
 }
 
-export const samplePropertySource: PropertySource = {
+export const propertySource: PropertySource = {
   async listProperties() {
-    return [{ id: "prop_esseboom", name: "Esseboom", suburb: "", ownerId: "owner_you" }];
+    const url = import.meta.env.VITE_PROPERTY_URL;
+    if (!url) return [];
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("property-unavailable");
+    const data = (await response.json()) as { properties?: DaupProperty[] } | DaupProperty[];
+    if (Array.isArray(data)) return data;
+    return data.properties ?? [];
   },
 };

@@ -93,6 +93,22 @@ export function unanswered(zoneKey: string, answers: { questionId: string }[]): 
   return questionsFor(zoneKey).filter((question) => !done.has(question.id));
 }
 
+export function answersForSkip(
+  zoneKey: string,
+  pending: { id: string }[],
+  saved: { questionId: string; text: string }[],
+  current?: { questionId: string; text: string } | null,
+): { questionId: string; text: string }[] {
+  return pending.map((question) => {
+    if (current && current.questionId === question.id && current.text.trim()) {
+      return { questionId: question.id, text: current.text.trim() };
+    }
+    const given = saved.find((answer) => answer.questionId === question.id && answer.text.trim());
+    if (given) return { questionId: question.id, text: given.text };
+    return { questionId: question.id, text: bestGuess(zoneKey, question.id) };
+  });
+}
+
 export function bestGuess(zoneKey: string, questionId: string): string {
   if (zoneKey === "living" && questionId === "boards") return "Yes. Boards.";
   if (zoneKey === "kitchen" && questionId === "use") return "Home kitchen.";

@@ -1,10 +1,8 @@
 import { Link } from "react-router-dom";
 import { copy } from "../copy";
 import { Wordmark } from "../components/Chrome";
-import { useRenovate } from "../state/store";
 
 export default function You() {
-  const { reset } = useRenovate();
   return (
     <div className="page has-action">
       <Wordmark />
@@ -14,9 +12,6 @@ export default function You() {
       <Link className="text-btn" to="/budget">
         {copy.seeEstimate}
       </Link>
-      <button className="text-btn" type="button" onClick={reset}>
-        {copy.loadSample}
-      </button>
       <div className="action-bar">
         <a className="btn btn-primary btn-wide" href="https://apps.daup.co.za">
           {copy.openHub}

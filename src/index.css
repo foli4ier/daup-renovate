@@ -35,7 +35,7 @@ img {
 }
 
 .page.has-stack {
-  padding-bottom: calc(320px + env(safe-area-inset-bottom));
+  padding-bottom: calc(168px + env(safe-area-inset-bottom));
 }
 
 h1,
@@ -190,6 +190,16 @@ h3 {
   font-weight: 650;
 }
 
+/* daup-theme has no amber token. This notice uses chip and forest so it is not the failure colour. */
+.photo-warn {
+  background: var(--chip);
+  color: var(--ink);
+  border-left: 4px solid var(--forest);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-weight: 650;
+}
+
 .total {
   font-family: var(--serif);
   font-size: 34px;
@@ -269,12 +279,13 @@ h3 {
 
 .property-card {
   display: grid;
-  grid-template-columns: 72px 1fr;
+  grid-template-columns: 48px 1fr;
   gap: 12px;
   align-items: center;
   width: 100%;
   min-height: 72px;
-  padding: 8px;
+  height: 72px;
+  padding: 0 12px;
   border: 0;
   border-radius: var(--radius);
   background: var(--card);
@@ -285,9 +296,9 @@ h3 {
 
 .property-card img,
 .property-card .ph {
-  width: 72px;
-  height: 72px;
-  border-radius: 12px;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
   aspect-ratio: auto;
 }
 
@@ -325,8 +336,8 @@ h3 {
   position: absolute;
   top: 4px;
   left: 4px;
-  min-width: 32px;
-  min-height: 28px;
+  min-width: var(--tap);
+  min-height: var(--tap);
   border-radius: 999px;
   border: 0;
   background: var(--white);
@@ -414,8 +425,8 @@ h3 {
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--chip);
-  aspect-ratio: 16 / 10;
-  max-height: 210px;
+  aspect-ratio: 4 / 3;
+  width: 100%;
 }
 
 .slider img {
@@ -448,8 +459,8 @@ h3 {
 }
 
 .impression {
-  margin: 0;
-  text-align: center;
+  margin: 12px 0 0;
+  text-align: left;
 }
 
 .slider-label {
@@ -554,10 +565,96 @@ h3 {
   width: 100%;
   max-width: 430px;
   max-height: 88dvh;
-  overflow: auto;
+  overflow: hidden;
   background: var(--white);
   border-radius: 20px 20px 0 0;
-  padding: 10px 18px calc(18px + env(safe-area-inset-bottom));
+  padding: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sheet-title {
+  padding: 0 18px;
+}
+
+.sheet-scroll {
+  overflow: auto;
+  padding: 0 18px 12px;
+  flex: 1;
+}
+
+.sheet-foot {
+  padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--white);
+}
+
+.zone-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  font-weight: 700;
+}
+
+.meter {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--chip);
+  overflow: hidden;
+  margin: 12px 0 8px;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  background: var(--forest);
+}
+
+.sample-banner {
+  margin: 0;
+  padding: 10px 18px;
+  background: var(--chip);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.sample-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.try-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.plan-card {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--white);
+  box-shadow: var(--shadow);
+  text-align: left;
+  color: inherit;
 }
 
 .grip {

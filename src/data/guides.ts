@@ -1,15 +1,15 @@
 import type { StyleId, Tier } from "../lib/prompt";
 
 export const STYLE_CHIPS: { id: StyleId; label: string }[] = [
-  { id: "budget-refresh", label: "Budget refresh" },
-  { id: "modern", label: "Modern" },
-  { id: "keep-character", label: "Keep character" },
+  { id: "budget-refresh", label: "Budget refresh." },
+  { id: "modern", label: "Modern." },
+  { id: "keep-character", label: "Keep character." },
 ];
 
 export const TIER_CHIPS: { id: Tier; label: string; hint: string }[] = [
-  { id: "low", label: "Low", hint: "Paint and fix" },
-  { id: "mid", label: "Mid", hint: "New finishes" },
-  { id: "high", label: "High", hint: "Bigger changes" },
+  { id: "low", label: "Low.", hint: "Paint and fix" },
+  { id: "mid", label: "Mid.", hint: "New finishes" },
+  { id: "high", label: "High.", hint: "Bigger changes" },
 ];
 
 export function styleLabel(style: StyleId, note?: string): string {

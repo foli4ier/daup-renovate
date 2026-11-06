@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { copy } from "../copy";
-import { bestGuess, unanswered } from "../data/questions";
+import { answersForSkip, bestGuess, unanswered } from "../data/questions";
 import { ActionBar, TopBar } from "../components/Chrome";
 import { activePlan } from "../state/select";
 import { useRenovate } from "../state/store";
@@ -107,7 +107,7 @@ export default function Questions() {
         className="text-btn"
         type="button"
         onClick={() => {
-          const answers = pending.map((item) => ({ questionId: item.id, text: bestGuess(zone.key, item.id) }));
+          const answers = answersForSkip(zone.key, pending, zone.answers, currentAnswer() ? { questionId: question.id, text: currentAnswer() ?? "" } : null);
           void finish(answers);
         }}
       >

@@ -65,6 +65,7 @@ export type NextZone = {
   name: string;
   hidden: boolean;
   order: number;
+  kind?: "inside" | "outside";
   beforeCount: number;
   link: LinkSnap;
 };
@@ -87,7 +88,10 @@ export function nextStep(input: {
   const open = input.zones
     .filter((zone) => !zone.hidden)
     .slice()
-    .sort((a, b) => a.order - b.order)
+    .sort((a, b) => {
+      if (a.kind && b.kind && a.kind !== b.kind) return a.kind === "outside" ? -1 : 1;
+      return a.order - b.order;
+    })
     .map((zone) => ({ zone, pill: pillOf(zone.link, zone.beforeCount) }))
     .filter((item) => item.pill !== "approved" && item.pill !== "skipped");
   const first = open[0];
@@ -104,6 +108,6 @@ export function nextStep(input: {
   return { kind: "zone", zoneId: first.zone.id, dest: "capture", label: `Generate ${first.zone.name}.` };
 }
 
-export function tryAgainLabel(attempts: number): string {
-  return `Try again. (${triesLeft(attempts)} left)`;
+export function triesRemaining(attempts: number): number {
+  return triesLeft(attempts);
 }

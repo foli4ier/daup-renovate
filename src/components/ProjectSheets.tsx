@@ -8,7 +8,7 @@ export function PushSheet({ onClose }: { onClose: () => void }) {
   const { pushProject, state } = useRenovate();
   const plan = activePlan(state);
   const [failed, setFailed] = useState(false);
-  const [done, setDone] = useState(false);
+  const [url, setUrl] = useState<string | null>(null);
 
   async function push() {
     setFailed(false);
@@ -17,45 +17,45 @@ export function PushSheet({ onClose }: { onClose: () => void }) {
       setFailed(true);
       return;
     }
-    setDone(true);
+    setUrl(result.url);
   }
 
   return (
-    <Sheet title="Push to Project" onClose={onClose}>
-      {done ? (
+    <Sheet
+      title="Push to Project"
+      onClose={onClose}
+      footer={
+        url ? (
+          <a className="btn btn-primary btn-wide" href={url} target="_blank" rel="noopener noreferrer">
+            {copy.openProject}
+          </a>
+        ) : (
+          <button className="btn btn-primary btn-wide" type="button" onClick={() => void push()}>
+            {copy.push}
+          </button>
+        )
+      }
+    >
+      {url ? (
         <>
           <p>{copy.inProject}</p>
-          <p className="meta">{plan?.name} is in DAUP Project. {copy.projectOpen}</p>
-          <button className="btn btn-primary btn-wide" type="button" onClick={onClose} style={{ marginTop: 16 }}>
-            {copy.close}
-          </button>
+          <p className="meta">
+            {plan?.name} is in DAUP Project. {copy.projectOpen}
+          </p>
         </>
       ) : (
         <>
           <p>{copy.projectNote}</p>
-          {failed ? <p className="warn" style={{ marginTop: 12 }}>{copy.nothingSent}</p> : null}
-          <button className="btn btn-primary btn-wide" type="button" onClick={() => void push()} style={{ marginTop: 16 }}>
-            {copy.push}
-          </button>
+          {failed ? (
+            <p className="warn" style={{ marginTop: 12 }}>
+              {copy.nothingSent}
+            </p>
+          ) : null}
           <button className="text-btn" type="button" onClick={onClose}>
             {copy.notNow}
           </button>
         </>
       )}
-    </Sheet>
-  );
-}
-
-export function ProjectSheet({ onClose }: { onClose: () => void }) {
-  const plan = activePlan(useRenovate().state);
-  return (
-    <Sheet title="In Project" onClose={onClose}>
-      <p>
-        {plan?.name} is in DAUP Project. {copy.projectOpen}
-      </p>
-      <button className="btn btn-primary btn-wide" type="button" onClick={onClose} style={{ marginTop: 16 }}>
-        {copy.close}
-      </button>
     </Sheet>
   );
 }

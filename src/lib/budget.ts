@@ -94,10 +94,24 @@ export function linesForZone(zone: ZoneBudgetInput): MoneyLine[] {
   });
 }
 
-export function totalRange(lines: MoneyLine[]): { low: number; high: number } | null {
+export type TotalReport = {
+  /** False while a per-m² line has no size, or nothing can be added up. */
+  ready: boolean;
+  low: number;
+  high: number;
+  needsSize: number;
+  quoteOnly: number;
+};
+
+/** The plan total is withheld until every sized line has a size. Quote-only lines stay out. */
+export function assessTotal(lines: MoneyLine[]): TotalReport {
+  const needsSize = lines.filter((line) => line.needsSize).length;
+  const quoteOnly = lines.filter((line) => line.quoteOnly).length;
   const counted = lines.filter((line) => !line.quoteOnly && !line.needsSize && line.low !== undefined && line.high !== undefined);
-  if (!counted.length) return null;
   return {
+    ready: needsSize === 0 && counted.length > 0,
+    needsSize,
+    quoteOnly,
     low: counted.reduce((sum, line) => sum + (line.low ?? 0), 0),
     high: counted.reduce((sum, line) => sum + (line.high ?? 0), 0),
   };

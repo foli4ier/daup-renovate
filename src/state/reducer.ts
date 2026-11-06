@@ -1,5 +1,7 @@
+import type { DaupProperty } from "../api/property";
 import { freshPhases } from "../data/phases";
-import { seed } from "../data/seed";
+import { emptyState } from "../data/seed";
+import { defaultZones } from "../data/zones";
 import type { StyleId, Tier } from "../lib/prompt";
 import { emptyLink, type CalloutRequest, type Photo, type Plan, type Proposal, type State, type Zone, type ZoneKind } from "./types";
 
@@ -7,6 +9,7 @@ const PHOTO_CAP = 6;
 
 export type Action =
   | { type: "replace"; state: State }
+  | { type: "hydrate-properties"; properties: DaupProperty[] }
   | { type: "select-property"; propertyId: string }
   | { type: "select-plan"; planId: string }
   | { type: "start-plan"; plan: Plan }
@@ -32,7 +35,7 @@ export type Action =
   | { type: "move-phase"; planId: string; phaseId: string; direction: "up" | "down" }
   | { type: "set-phase-days"; planId: string; phaseId: string; days: number }
   | { type: "approve-plan"; planId: string }
-  | { type: "pushed"; planId: string; projectId: string }
+  | { type: "pushed"; planId: string; projectId: string; projectUrl: string }
   | { type: "sent"; requests: CalloutRequest[] };
 
 function mapLink(state: State, planId: string, zoneId: string, edit: (link: State["links"][number]) => State["links"][number]): State {
@@ -45,7 +48,29 @@ function mapLink(state: State, planId: string, zoneId: string, edit: (link: Stat
 export function reduce(state: State, action: Action): State {
   switch (action.type) {
     case "replace":
-      return action.state.version === 1 ? action.state : seed();
+      return action.state.version === 2 ? action.state : emptyState();
+    case "hydrate-properties": {
+      const incoming = action.properties;
+      let zones = state.zones.filter((zone) => incoming.some((property) => property.id === zone.propertyId));
+      for (const property of incoming) {
+        if (!zones.some((zone) => zone.propertyId === property.id)) zones = [...zones, ...defaultZones(property.id)];
+      }
+      const properties = incoming.map((property) => ({
+        id: property.id,
+        name: property.name,
+        suburb: property.suburb,
+        ownerId: property.ownerId,
+        coverPhotoId: state.properties.find((item) => item.id === property.id)?.coverPhotoId ?? "",
+      }));
+      const activePropertyId = properties.some((property) => property.id === state.activePropertyId)
+        ? state.activePropertyId
+        : (properties[0]?.id ?? "");
+      const activePlanId =
+        state.plans.find((plan) => plan.id === state.activePlanId && plan.propertyId === activePropertyId)?.id ??
+        state.plans.find((plan) => plan.propertyId === activePropertyId)?.id ??
+        null;
+      return { ...state, properties, zones, activePropertyId, activePlanId, sample: false };
+    }
     case "select-property": {
       const plans = state.plans.filter((plan) => plan.propertyId === action.propertyId);
       const current = plans.find((plan) => plan.id === state.activePlanId);
@@ -238,7 +263,7 @@ export function reduce(state: State, action: Action): State {
       return {
         ...state,
         plans: state.plans.map((plan) => {
-          if (plan.id !== action.planId || plan.status !== "draft") return plan;
+          if (plan.id !== action.planId || (plan.status !== "draft" && plan.status !== "approved")) return plan;
           const phases = plan.phases.slice().sort((a, b) => a.order - b.order);
           const index = phases.findIndex((phase) => phase.id === action.phaseId);
           const swapWith = action.direction === "up" ? index - 1 : index + 1;
@@ -258,7 +283,7 @@ export function reduce(state: State, action: Action): State {
       return {
         ...state,
         plans: state.plans.map((plan) =>
-          plan.id === action.planId && plan.status === "draft"
+          plan.id === action.planId && (plan.status === "draft" || plan.status === "approved")
             ? {
                 ...plan,
                 phases: plan.phases.map((phase) =>
@@ -281,7 +306,9 @@ export function reduce(state: State, action: Action): State {
       return {
         ...state,
         plans: state.plans.map((plan) =>
-          plan.id === action.planId ? { ...plan, status: "in-project", projectId: action.projectId, phasesApproved: true } : plan,
+          plan.id === action.planId
+            ? { ...plan, status: "in-project", projectId: action.projectId, projectUrl: action.projectUrl, phasesApproved: true }
+            : plan,
         ),
       };
     case "sent":

@@ -4,7 +4,7 @@ import { copy } from "../copy";
 import { SUGGESTIONS, STYLE_CHIPS, TIER_CHIPS } from "../data/guides";
 import { unanswered } from "../data/questions";
 import { ABOUT_ONE_MEGAPIXEL, type StyleId, type Tier } from "../lib/prompt";
-import { ActionBar, TopBar } from "../components/Chrome";
+import { TopBar } from "../components/Chrome";
 import { activePlan, linkFor, photosFor } from "../state/select";
 import { useRenovate } from "../state/store";
 
@@ -43,6 +43,7 @@ export default function Capture() {
   const [ownKeep, setOwnKeep] = useState("");
   const [ownReplace, setOwnReplace] = useState("");
   const [used, setUsed] = useState("");
+  const [photoError, setPhotoError] = useState(false);
   const suggestions = SUGGESTIONS[zone?.key ?? ""] ?? { keep: [], replace: [] };
 
   if (!plan || !zone || !link) {
@@ -71,7 +72,14 @@ export default function Capture() {
   async function addFiles(list: FileList | null) {
     const file = list?.[0];
     if (!file || photos.length >= PHOTO_CAP) return;
-    const measured = await measure(file);
+    setPhotoError(false);
+    let measured: { url: string; width: number; height: number };
+    try {
+      measured = await measure(file);
+    } catch {
+      setPhotoError(true);
+      return;
+    }
     addPhoto({
       id: `photo_${crypto.randomUUID()}`,
       zoneId,
@@ -105,11 +113,9 @@ export default function Capture() {
   const small = photos.filter((photo) => photo.width * photo.height < ABOUT_ONE_MEGAPIXEL);
 
   return (
-    <div className="page has-action">
+    <div className="page">
       <TopBar title={zone.name} />
-      <p>{copy.tip}</p>
-      <p className="meta">{copy.people}</p>
-      <div className="photo-row" style={{ marginTop: 12 }}>
+      <div className="photo-row">
         {photos.map((photo) => (
           <div key={photo.id} className={photo.starred ? "thumb starred" : "thumb"}>
             <img src={photo.url} alt="" />
@@ -130,10 +136,11 @@ export default function Capture() {
       </div>
       {photos.some((photo) => photo.starred) ? <p className="meta">{copy.mainPhoto}</p> : null}
       {small.map((photo) => (
-        <p key={photo.id} className="warn" style={{ marginTop: 10 }}>
+        <p key={photo.id} className="photo-warn" style={{ marginTop: 10 }}>
           {copy.smallPhoto(photo.width, photo.height)}
         </p>
       ))}
+      {photoError ? <p className="warn">{copy.photoRead}</p> : null}
       {photos.length >= PHOTO_CAP ? (
         <p className="meta">{copy.sixLimit}</p>
       ) : (
@@ -148,6 +155,8 @@ export default function Capture() {
           <input ref={uploadRef} className="sr-only" type="file" accept="image/*" onChange={(event) => void addFiles(event.target.files)} />
         </div>
       )}
+      <p style={{ marginTop: 16 }}>{copy.tip}</p>
+      <p className="meta">{copy.people}</p>
 
       <h2 style={{ marginTop: 22 }}>Style</h2>
       <div className="chips" style={{ marginTop: 8 }}>
@@ -210,6 +219,7 @@ export default function Capture() {
       </div>
 
       <h2 style={{ marginTop: 18 }}>Keep</h2>
+      <p className="meta">{copy.keepOptional}</p>
       <div className="chips" style={{ marginTop: 8 }}>
         {[...new Set([...suggestions.keep, ...keep])].map((item) => (
           <button key={item} type="button" className="choice" aria-pressed={keep.includes(item)} onClick={() => toggle(keep, item, "keep")}>
@@ -236,6 +246,7 @@ export default function Capture() {
       </form>
 
       <h2 style={{ marginTop: 18 }}>Replace</h2>
+      <p className="meta">{copy.replaceOptional}</p>
       <div className="chips" style={{ marginTop: 8 }}>
         {[...new Set([...suggestions.replace, ...replace])].map((item) => (
           <button key={item} type="button" className="choice" aria-pressed={replace.includes(item)} onClick={() => toggle(replace, item, "replace")}>
@@ -261,7 +272,7 @@ export default function Capture() {
         </button>
       </form>
 
-      {style && budget ? (
+      {style && budget && state.links.some((item) => item.planId === plan.id && item.zoneId !== zoneId && item.style && item.budget) ? (
         <button
           className="choice"
           type="button"
@@ -278,11 +289,9 @@ export default function Capture() {
       {used ? <p className="meta">{used}</p> : null}
       {!ready ? <p className="meta">{photos.length ? copy.pickStyle : copy.addPhotos(zone.name)}</p> : null}
 
-      <ActionBar>
-        <button className="btn btn-primary btn-wide" type="button" disabled={!ready || busyZoneId === zoneId} onClick={() => void onGenerate()}>
-          {busyZoneId === zoneId ? copy.making : copy.generate}
-        </button>
-      </ActionBar>
+      <button className="btn btn-primary btn-wide" type="button" disabled={!ready || busyZoneId === zoneId} onClick={() => void onGenerate()} style={{ marginTop: 16 }}>
+        {busyZoneId === zoneId ? copy.making : copy.generate}
+      </button>
     </div>
   );
 }

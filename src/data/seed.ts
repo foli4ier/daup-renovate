@@ -1,7 +1,8 @@
 import { freshPhases } from "./phases";
 import { emptyLink, type Photo, type PlanLink, type State, type Zone } from "../state/types";
 
-export const STORAGE_KEY = "daup-renovate-v1";
+export const STORAGE_KEY = "daup-renovate-v2";
+export const SAMPLE_SESSION_KEY = "daup-renovate-sample-session";
 
 const PROPERTY = "prop_esseboom";
 const PLAN = "plan_refresh";
@@ -99,7 +100,8 @@ export function seed(): State {
   ];
 
   return {
-    version: 1,
+    version: 2,
+    sample: true,
     properties: [
       {
         id: PROPERTY,
@@ -189,7 +191,7 @@ export function seed(): State {
         id: "prop_kitchen",
         planId: PLAN,
         zoneId: "zone_kitchen",
-        beforePhotoId: "photo_sink",
+        beforePhotoId: "photo_cabinets",
         imageUrl: "/esseboom/kitchen-after.svg",
         createdAt: "2026-11-06T05:15:00.000Z",
       },
@@ -211,6 +213,27 @@ export function seed(): State {
 export const SAMPLE_AFTER_BY_PHOTO: Record<string, string> = {
   photo_front: "/esseboom/front-yard-after.svg",
   photo_living: "/esseboom/living-area-after.svg",
+  photo_cabinets: "/esseboom/kitchen-after.svg",
   photo_sink: "/esseboom/kitchen-after.svg",
   photo_bath: "/esseboom/bathroom-after.svg",
 };
+
+export function emptyState(): State {
+  return {
+    version: 2,
+    sample: false,
+    properties: [],
+    zones: [],
+    photos: [],
+    plans: [],
+    links: [],
+    proposals: [],
+    requests: [],
+    activePropertyId: "",
+    activePlanId: null,
+  };
+}
+
+export function sampleRequested(): boolean {
+  return import.meta.env.DEV && new URLSearchParams(window.location.search).get("sample") === "1";
+}
