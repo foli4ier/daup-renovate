@@ -141,7 +141,7 @@ export default function Callout() {
           {failed ? <p className="warn">{copy.nothingSent}</p> : null}
           {sent ? (
             <p className="banner" style={{ marginTop: 12 }}>
-              {copy.sent} Contractors on Workshop can reply.
+              {copy.sent}
             </p>
           ) : (
             <div className="action-bar">

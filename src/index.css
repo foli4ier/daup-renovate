@@ -31,11 +31,11 @@ img {
 }
 
 .page.has-action {
-  padding-bottom: calc(168px + env(safe-area-inset-bottom));
+  padding-bottom: calc(200px + env(safe-area-inset-bottom));
 }
 
 .page.has-skip {
-  padding-bottom: calc(220px + env(safe-area-inset-bottom));
+  padding-bottom: calc(300px + env(safe-area-inset-bottom));
 }
 
 h1,
@@ -658,6 +658,17 @@ h3 {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.drift-link {
+  display: flex;
+  width: 100%;
+  height: auto;
+  min-height: var(--tap);
+  white-space: normal;
+  line-height: 1.35;
+  text-align: center;
+  padding: 8px 4px;
 }
 
 .plan-card {

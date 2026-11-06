@@ -151,7 +151,7 @@ export default function Gallery() {
       {zone && link ? (
         <>
           <button
-            className="text-btn"
+            className="text-btn drift-link"
             type="button"
             disabled={left === 0}
             onClick={() => {
@@ -161,17 +161,17 @@ export default function Gallery() {
           >
             {copy.drift}
           </button>
+        </>
+      ) : null}
+
+      {driftOpen || pushOpen || !zone || !link ? null : (
+        <ActionBar>
           <div className="try-row">
             <button className="btn btn-outline" type="button" disabled={left === 0 || busyZoneId === zone.id} onClick={() => void retry(false)}>
               {copy.tryAgain}
             </button>
             <span className="meta">{copy.triesLeft(left)}</span>
           </div>
-        </>
-      ) : null}
-
-      {driftOpen || pushOpen || !zone || !link ? null : (
-        <ActionBar>
           <button
             className="btn btn-primary btn-wide"
             type="button"

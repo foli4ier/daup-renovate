@@ -10,6 +10,7 @@ export function EditZones({ onClose }: { onClose: () => void }) {
   const property = activeProperty(state);
   const zones = property ? propertyZones(state, property.id) : [];
   const [openId, setOpenId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftKind, setDraftKind] = useState<ZoneKind>("inside");
   const [merge, setMerge] = useState<{ source: Zone; targetId: string } | null>(null);
@@ -30,6 +31,7 @@ export function EditZones({ onClose }: { onClose: () => void }) {
     };
     dispatch({ type: "add-zone", zone });
     setDraftName("");
+    setAdding(false);
   }
 
   return (
@@ -49,9 +51,29 @@ export function EditZones({ onClose }: { onClose: () => void }) {
             {copy.merge}
           </button>
         ) : (
-          <button className="btn btn-primary btn-wide" type="button" onClick={onClose}>
-            {copy.done}
-          </button>
+          <>
+            {adding ? (
+              <div>
+                <label className="field">
+                  Name
+                  <input value={draftName} placeholder={copy.placeholderName} onChange={(event) => setDraftName(event.target.value)} />
+                </label>
+                <div className="chips">
+                  {(["outside", "inside"] as const).map((kind) => (
+                    <button key={kind} type="button" className="choice" aria-pressed={draftKind === kind} onClick={() => setDraftKind(kind)}>
+                      {kind === "outside" ? "Outside." : "Inside."}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <button className="btn btn-outline btn-wide" type="button" onClick={() => (adding ? add() : setAdding(true))}>
+              {copy.addZone}
+            </button>
+            <button className="btn btn-primary btn-wide" type="button" onClick={onClose}>
+              {copy.done}
+            </button>
+          </>
         )
       }
     >
@@ -152,21 +174,6 @@ export function EditZones({ onClose }: { onClose: () => void }) {
               ) : null}
             </div>
           ))}
-          <h3 style={{ marginTop: 16 }}>Add a zone</h3>
-          <label className="field">
-            Name
-            <input value={draftName} placeholder={copy.placeholderName} onChange={(event) => setDraftName(event.target.value)} />
-          </label>
-          <div className="chips">
-            {(["outside", "inside"] as const).map((kind) => (
-              <button key={kind} type="button" className="choice" aria-pressed={draftKind === kind} onClick={() => setDraftKind(kind)}>
-                {kind === "outside" ? "Outside." : "Inside."}
-              </button>
-            ))}
-          </div>
-          <button className="btn btn-outline btn-wide" type="button" onClick={add} style={{ marginTop: 8 }}>
-            {copy.addZone}
-          </button>
         </>
       )}
     </Sheet>

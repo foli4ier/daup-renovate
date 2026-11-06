@@ -67,7 +67,7 @@ export default function Zones() {
   }
 
   return (
-    <div className="page">
+    <div className={`page ${editing || sheet ? "" : "has-action"}`}>
       <Wordmark />
       <p className="kicker">Plan</p>
       <h1>{plan.name}</h1>
@@ -87,11 +87,6 @@ export default function Zones() {
           ))}
         </ul>
       ) : null}
-      {editing || sheet ? null : (
-        <button className="btn btn-primary btn-wide" type="button" onClick={follow}>
-          {next.label}
-        </button>
-      )}
       <div className="zone-grid">
         {visible.map((zone) => {
           const photos = photosFor(state, zone.id);
@@ -148,6 +143,13 @@ export default function Zones() {
           );
         })}
       </div>
+      {editing || sheet ? null : (
+        <ActionBar>
+          <button className="btn btn-primary btn-wide" type="button" onClick={follow}>
+            {next.label}
+          </button>
+        </ActionBar>
+      )}
       {editing ? <EditZones onClose={() => setParams({})} /> : null}
       {sheet === "push" ? <PushSheet onClose={() => setSheet(null)} /> : null}
     </div>
