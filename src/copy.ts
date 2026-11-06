@@ -76,6 +76,7 @@ export const copy = {
   propertiesFailed: "We couldn’t load DAUP Property. Try again.",
   tryLoad: "Try again.",
   noMatch: "No property matches that.",
+  clearSearch: "Clear search.",
   sampleBanner: "Sample drawings, not photos of the house.",
   sampleMark: "Sample",
   quoteOutside: "Quote only lines stay out of the total.",

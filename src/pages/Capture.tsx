@@ -4,7 +4,7 @@ import { copy } from "../copy";
 import { SUGGESTIONS, STYLE_CHIPS, TIER_CHIPS } from "../data/guides";
 import { unanswered } from "../data/questions";
 import { ABOUT_ONE_MEGAPIXEL, type StyleId, type Tier } from "../lib/prompt";
-import { TopBar } from "../components/Chrome";
+import { ActionBar, TopBar } from "../components/Chrome";
 import { activePlan, linkFor, photosFor } from "../state/select";
 import { useRenovate } from "../state/store";
 
@@ -113,7 +113,7 @@ export default function Capture() {
   const small = photos.filter((photo) => photo.width * photo.height < ABOUT_ONE_MEGAPIXEL);
 
   return (
-    <div className="page">
+    <div className="page has-action">
       <TopBar title={zone.name} />
       <div className="photo-row">
         {photos.map((photo) => (
@@ -289,9 +289,11 @@ export default function Capture() {
       {used ? <p className="meta">{used}</p> : null}
       {!ready ? <p className="meta">{photos.length ? copy.pickStyle : copy.addPhotos(zone.name)}</p> : null}
 
-      <button className="btn btn-primary btn-wide" type="button" disabled={!ready || busyZoneId === zoneId} onClick={() => void onGenerate()} style={{ marginTop: 16 }}>
-        {busyZoneId === zoneId ? copy.making : copy.generate}
-      </button>
+      <ActionBar>
+        <button className="btn btn-primary btn-wide" type="button" disabled={!ready || busyZoneId === zoneId} onClick={() => void onGenerate()}>
+          {busyZoneId === zoneId ? copy.making : copy.generate}
+        </button>
+      </ActionBar>
     </div>
   );
 }

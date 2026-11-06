@@ -67,7 +67,7 @@ export default function Zones() {
   }
 
   return (
-    <div className={`page ${editing || sheet ? "" : "has-action"}`}>
+    <div className="page">
       <Wordmark />
       <p className="kicker">Plan</p>
       <h1>{plan.name}</h1>
@@ -75,6 +75,23 @@ export default function Zones() {
       <button className="text-btn" type="button" onClick={() => setParams({ edit: "1" })}>
         {copy.editZones}
       </button>
+      {hidden.length ? (
+        <button className="text-btn" type="button" onClick={() => setHiddenOpen((open) => !open)}>
+          {copy.hidden(hidden.length)}
+        </button>
+      ) : null}
+      {hiddenOpen ? (
+        <ul>
+          {hidden.map((zone) => (
+            <li key={zone.id}>{zone.name}</li>
+          ))}
+        </ul>
+      ) : null}
+      {editing || sheet ? null : (
+        <button className="btn btn-primary btn-wide" type="button" onClick={follow}>
+          {next.label}
+        </button>
+      )}
       <div className="zone-grid">
         {visible.map((zone) => {
           const photos = photosFor(state, zone.id);
@@ -131,25 +148,6 @@ export default function Zones() {
           );
         })}
       </div>
-      {hidden.length ? (
-        <button className="text-btn" type="button" onClick={() => setHiddenOpen((open) => !open)}>
-          {copy.hidden(hidden.length)}
-        </button>
-      ) : null}
-      {hiddenOpen ? (
-        <ul>
-          {hidden.map((zone) => (
-            <li key={zone.id}>{zone.name}</li>
-          ))}
-        </ul>
-      ) : null}
-      {editing || sheet ? null : (
-        <ActionBar>
-          <button className="btn btn-primary btn-wide" type="button" onClick={follow}>
-            {next.label}
-          </button>
-        </ActionBar>
-      )}
       {editing ? <EditZones onClose={() => setParams({})} /> : null}
       {sheet === "push" ? <PushSheet onClose={() => setSheet(null)} /> : null}
     </div>

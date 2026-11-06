@@ -33,6 +33,10 @@ const StoreContext = createContext<StoreValue | null>(null);
 
 function load(): State {
   if (typeof window !== "undefined" && sampleRequested()) {
+    if (new URLSearchParams(window.location.search).get("plan") === "none") {
+      const fresh = seed();
+      return { ...fresh, plans: [], links: [], proposals: [], requests: [], activePlanId: null };
+    }
     try {
       const raw = sessionStorage.getItem(SAMPLE_SESSION_KEY);
       if (raw) {
@@ -71,6 +75,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (state.sample) {
+      if (new URLSearchParams(window.location.search).get("plan") === "none") return;
       sessionStorage.setItem(SAMPLE_SESSION_KEY, JSON.stringify(state));
       return;
     }

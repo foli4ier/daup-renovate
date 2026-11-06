@@ -4,6 +4,7 @@ import { copy } from "../copy";
 import { styleLabel, tierLabel } from "../data/guides";
 import { ActionBar, BeforeAfter, Sheet, TopBar } from "../components/Chrome";
 import { PushSheet } from "../components/ProjectSheets";
+import { whatChanges } from "../lib/changes";
 import { triesLeft } from "../lib/prompt";
 import { activePlan, linkFor, photosFor, planNext, proposalsFor, stepHref, visibleZones, zonePill } from "../state/select";
 import { useRenovate } from "../state/store";
@@ -92,7 +93,7 @@ export default function Gallery() {
   }
 
   return (
-    <div className={`page ${driftOpen || pushOpen ? "" : "has-action"}`}>
+    <div className={`page ${driftOpen || pushOpen ? "" : "has-skip"}`}>
       <TopBar title={zone?.name} />
       <div className="snap" ref={scroller} onScroll={onScroll}>
         {slides.map((slide) => {
@@ -123,7 +124,7 @@ export default function Gallery() {
         <>
           <h2 style={{ marginTop: 16 }}>{copy.whatChanges}</h2>
           <ul className="changes">
-            {link.replace.map((item) => (
+            {whatChanges(link.replace).map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
@@ -166,16 +167,6 @@ export default function Gallery() {
             </button>
             <span className="meta">{copy.triesLeft(left)}</span>
           </div>
-          <button
-            className="text-btn"
-            type="button"
-            onClick={() => {
-              dispatch({ type: "skip-zone", planId: plan.id, zoneId: zone.id });
-              navigate("/plan");
-            }}
-          >
-            {copy.skipZone}
-          </button>
         </>
       ) : null}
 
@@ -195,6 +186,16 @@ export default function Gallery() {
             }}
           >
             {current && link.approvedProposalId === current.id ? next.label : copy.approve}
+          </button>
+          <button
+            className="text-btn"
+            type="button"
+            onClick={() => {
+              dispatch({ type: "skip-zone", planId: plan.id, zoneId: zone.id });
+              navigate("/plan");
+            }}
+          >
+            {copy.skipZone}
           </button>
         </ActionBar>
       )}

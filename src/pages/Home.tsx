@@ -95,7 +95,7 @@ export default function Home() {
       {state.sample ? <p className="sample-tag">{copy.sampleMark}</p> : null}
 
       {plan && counts ? (
-        <section className="card">
+        <section className="card home-card">
           <p className="kicker">{copy.continuePlan}</p>
           <h2>{plan.name}</h2>
           <p>{copy.zoneScore(counts.total, counts.approved)}</p>

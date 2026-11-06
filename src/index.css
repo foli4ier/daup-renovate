@@ -34,8 +34,8 @@ img {
   padding-bottom: calc(168px + env(safe-area-inset-bottom));
 }
 
-.page.has-stack {
-  padding-bottom: calc(168px + env(safe-area-inset-bottom));
+.page.has-skip {
+  padding-bottom: calc(220px + env(safe-area-inset-bottom));
 }
 
 h1,
@@ -123,16 +123,15 @@ h3 {
 }
 
 .hero {
-  margin: 8px 0 16px;
+  margin: 8px 0 12px;
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--chip);
-  min-height: 180px;
 }
 
 .hero img {
   width: 100%;
-  height: 210px;
+  height: 72px;
   object-fit: cover;
 }
 
@@ -227,6 +226,23 @@ h3 {
 }
 
 .zone-tile img,
+.zone-tile .ph {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 72px;
+  object-fit: cover;
+  background: var(--chip);
+}
+
+.home-card {
+  padding: 12px 14px;
+  gap: 6px;
+}
+
+.home-card h2 {
+  font-size: 22px;
+}
+
 .ph {
   width: 100%;
   aspect-ratio: 4 / 3;
@@ -284,8 +300,7 @@ h3 {
   align-items: center;
   width: 100%;
   min-height: 72px;
-  height: 72px;
-  padding: 0 12px;
+  padding: 8px 12px;
   border: 0;
   border-radius: var(--radius);
   background: var(--card);

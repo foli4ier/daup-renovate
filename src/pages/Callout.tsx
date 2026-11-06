@@ -39,7 +39,7 @@ export default function Callout() {
   const chosen = zones.filter((zone) => picked.includes(zone.id));
 
   return (
-    <div className="page has-action">
+    <div className={`page ${sent ? "" : "has-action"}`}>
       <TopBar title="CallOut" />
       {step === "choose" ? (
         <>
@@ -139,33 +139,38 @@ export default function Callout() {
           </div>
           <p className="meta">{copy.workshop}</p>
           {failed ? <p className="warn">{copy.nothingSent}</p> : null}
-          {sent ? <p className="banner" style={{ marginTop: 12 }}>{copy.sent}</p> : null}
-          <div className="action-bar">
-            <button
-              className="btn btn-primary btn-wide"
-              type="button"
-              disabled={sent || chosen.some((zone) => findLeak(scopeFor(state, plan, zone)) !== null)}
-              onClick={() => {
-                setFailed(false);
-                void sendCallouts(chosen.map((zone) => zone.id)).then((result) => {
-                  if (result.blocked) {
-                    setSent(false);
-                    return;
-                  }
-                  if (result.ok) {
-                    setSent(true);
-                    return;
-                  }
-                  setFailed(true);
-                });
-              }}
-            >
-              {copy.send}
-            </button>
-            <button className="text-btn" type="button" onClick={() => setStep("choose")}>
-              {copy.back}
-            </button>
-          </div>
+          {sent ? (
+            <p className="banner" style={{ marginTop: 12 }}>
+              {copy.sent} Contractors on Workshop can reply.
+            </p>
+          ) : (
+            <div className="action-bar">
+              <button
+                className="btn btn-primary btn-wide"
+                type="button"
+                disabled={chosen.some((zone) => findLeak(scopeFor(state, plan, zone)) !== null)}
+                onClick={() => {
+                  setFailed(false);
+                  void sendCallouts(chosen.map((zone) => zone.id)).then((result) => {
+                    if (result.blocked) {
+                      setSent(false);
+                      return;
+                    }
+                    if (result.ok) {
+                      setSent(true);
+                      return;
+                    }
+                    setFailed(true);
+                  });
+                }}
+              >
+                {copy.send}
+              </button>
+              <button className="text-btn" type="button" onClick={() => setStep("choose")}>
+                {copy.back}
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

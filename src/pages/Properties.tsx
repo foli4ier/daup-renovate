@@ -47,7 +47,14 @@ export default function Properties() {
           placeholder="Search"
         />
       ) : null}
-      {showSearch && query.trim() && visible.length === 0 ? <p>{copy.noMatch}</p> : null}
+      {showSearch && query.trim() && visible.length === 0 ? (
+        <>
+          <p>{copy.noMatch}</p>
+          <button className="btn btn-primary" type="button" onClick={() => setQuery("")}>
+            {copy.clearSearch}
+          </button>
+        </>
+      ) : null}
       <div className="stack" style={{ marginTop: 12 }}>
         {visible.map((property) => {
           const plans = state.plans.filter((plan) => plan.propertyId === property.id);

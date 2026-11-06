@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { copy } from "../copy";
 import { activePlan } from "../state/select";
 import { useRenovate } from "../state/store";
 import { Sheet } from "./Chrome";
 
 export function PushSheet({ onClose }: { onClose: () => void }) {
+  const navigate = useNavigate();
   const { pushProject, state } = useRenovate();
   const plan = activePlan(state);
   const [failed, setFailed] = useState(false);
@@ -42,6 +44,17 @@ export function PushSheet({ onClose }: { onClose: () => void }) {
           <p className="meta">
             {plan?.name} is in DAUP Project. {copy.projectOpen}
           </p>
+          <p>Next: {copy.sendNext}</p>
+          <button
+            className="text-btn"
+            type="button"
+            onClick={() => {
+              onClose();
+              navigate("/callout");
+            }}
+          >
+            {copy.sendNext}
+          </button>
         </>
       ) : (
         <>

@@ -106,7 +106,7 @@ export function seed(): State {
       {
         id: PROPERTY,
         name: "Esseboom",
-        suburb: "",
+        suburb: "Gardens",
         ownerId: "owner_you",
         coverPhotoId: "photo_front",
       },
@@ -122,6 +122,15 @@ export function seed(): State {
         createdAt: "2026-11-06T05:15:00.000Z",
         phasesApproved: false,
         phases: freshPhases(PLAN),
+      },
+      {
+        id: "plan_winter",
+        propertyId: PROPERTY,
+        name: "Winter paint",
+        status: "done",
+        createdAt: "2026-06-01T08:00:00.000Z",
+        phasesApproved: true,
+        phases: freshPhases("plan_winter"),
       },
     ],
     links: [
