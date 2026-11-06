@@ -1,0 +1,29 @@
+{
+  "name": "daup-renovate",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && tsc -p tsconfig.worker.json && vite build",
+    "preview": "vite preview",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc -b && tsc -p tsconfig.worker.json"
+  },
+  "dependencies": {
+    "daup-theme": "github:foli4ier/daup-theme#main",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251106.0",
+    "@types/node": "^22.20.5",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tsx": "^4.20.6",
+    "typescript": "~5.6.3",
+    "vite": "^5.4.11"
+  }
+}
