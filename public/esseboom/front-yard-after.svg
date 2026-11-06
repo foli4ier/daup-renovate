@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img">
+
+  <rect width="1200" height="900" fill="#8eb4d4"/>
+  <circle cx="980" cy="120" r="54" fill="#f4e7c4"/>
+  <rect y="520" width="1200" height="380" fill="#3f7d46"/>
+  <rect x="70" y="560" width="1060" height="70" fill="#2a241c"/>
+  <rect x="90" y="575" width="40" height="70" fill="#6d8f62"/>
+  <rect x="180" y="590" width="70" height="55" fill="#7ea07a"/>
+  <rect x="280" y="600" width="36" height="45" fill="#2f4a3c"/>
+  <rect x="360" y="585" width="80" height="60" fill="#8eae86"/>
+  <rect x="500" y="595" width="34" height="50" fill="#2f4a3c"/>
+  <rect x="600" y="580" width="90" height="65" fill="#6d8f62"/>
+  <rect x="760" y="600" width="40" height="45" fill="#2f4a3c"/>
+  <rect x="860" y="585" width="70" height="60" fill="#8eae86"/>
+  <rect x="80" y="300" width="1040" height="280" fill="#b7b7b4"/>
+  <rect x="80" y="248" width="1040" height="22" fill="#e7e7e4"/>
+  <polygon points="80,248 560,118 1040,248" fill="#b7b7b4"/>
+  <polygon points="80,248 560,118 1040,248" fill="none" stroke="#e7e7e4" stroke-width="10"/>
+  <rect x="430" y="150" width="150" height="110" fill="#e6d3b0"/>
+  <path d="M430 230 L448 155 L478 205 L508 145 L536 214 L562 162 L580 230 Z" fill="#cbb892"/>
+  <rect x="150" y="340" width="150" height="120" fill="#d5e4ea" stroke="#3a3d42" stroke-width="8"/>
+  <path d="M150 400 H300 M225 340 V460" stroke="#3a3d42" stroke-width="4"/>
+  <rect x="360" y="360" width="120" height="100" fill="#d5e4ea" stroke="#3a3d42" stroke-width="8"/>
+  <path d="M360 410 H480 M420 360 V460" stroke="#3a3d42" stroke-width="4"/>
+  <rect x="700" y="340" width="180" height="140" fill="#d5e4ea" stroke="#3a3d42" stroke-width="8"/>
+  <path d="M790 340 V480 M700 410 H880" stroke="#3a3d42" stroke-width="4"/>
+  <text x="930" y="430" font-family="Georgia, serif" font-size="42" fill="#3a3d42">17</text>
+  <rect x="980" y="360" width="140" height="220" fill="#3a3d42"/>
+  <path d="M980 420 H1120 M980 480 H1120 M980 540 H1120" stroke="#2a2d31" stroke-width="8"/>
+  <rect x="70" y="400" width="70" height="40" fill="#d9dde0"/>
+
+</svg>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img">
+
+  <rect width="1200" height="900" fill="#f7f6f3"/>
+  <rect x="0" y="360" width="1200" height="540" fill="#d5d8d6"/>
+  <path d="M0 450 H1200 M0 560 H1200 M0 670 H1200 M0 780 H1200 M120 360 V900 M280 360 V900 M440 360 V900 M600 360 V900 M760 360 V900 M920 360 V900 M1080 360 V900" stroke="#c5cac7" stroke-width="4"/>
+  <rect x="60" y="40" width="280" height="220" fill="#f4f1ea" stroke="#e4e0d8" stroke-width="8"/>
+  <rect x="80" y="60" width="240" height="36" fill="#fbfbfb" stroke="#ddd"/>
+  <rect x="70" y="430" width="620" height="250" rx="40" fill="#fbfbfb" stroke="#e6e6e6" stroke-width="6"/>
+  <rect x="110" y="390" width="40" height="50" fill="#c5cdd1"/>
+  <rect x="760" y="420" width="36" height="280" fill="#cfd3d1"/>
+  <path d="M760 460 H900 M760 510 H880 M760 560 H900 M760 610 H880" stroke="#b7bdb9" stroke-width="8"/>
+  <rect x="980" y="430" width="140" height="90" rx="16" fill="#fbfbfb" stroke="#e6e6e6"/>
+
+</svg>
