@@ -155,7 +155,25 @@ export default function Gallery() {
           <p className="meta">{copy.useLookHelp}</p>
         </>
       ) : null}
-      {hasUpload && pictures.length > 1 ? (
+      {link?.style && link.budget ? (
+        <div className="chips" style={{ marginTop: 12 }}>
+          <span className="choice" aria-pressed="true">
+            {styleLabel(link.style, link.styleNote, link.style === "from-after" ? fromZone?.name : undefined)}
+          </span>
+          <span className="choice" aria-pressed="true">{tierLabel(link.budget)}</span>
+        </div>
+      ) : null}
+      {changes.length ? (
+        <>
+          <h2 id="what-changes" style={{ marginTop: 16 }}>{copy.whatChanges}</h2>
+          <ul className="changes">
+            {changes.map((item, index) => (
+              <li key={`${index}-${item}`}>{item}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {pictures.length > 1 ? (
         <div className="photo-row" id="proposal-thumbs" style={{ marginTop: 12 }}>
           {pictures.map((picture) => (
             <button
@@ -170,69 +188,36 @@ export default function Gallery() {
           ))}
         </div>
       ) : null}
-      {showingUploaded ? <p className="meta impression">{copy.uploadedAfter}</p> : null}
-      {link?.style && link.budget ? (
-        <div className="chips" style={{ marginTop: 12 }}>
-          <span className="choice" aria-pressed="true">
-            {styleLabel(link.style, link.styleNote, link.style === "from-after" ? fromZone?.name : undefined)}
-          </span>
-          <span className="choice" aria-pressed="true">{tierLabel(link.budget)}</span>
-        </div>
-      ) : null}
-      {changes.length ? (
-        <>
-          <h2 style={{ marginTop: 16 }}>{copy.whatChanges}</h2>
-          <ul className="changes">
-            {changes.map((item, index) => (
-              <li key={`${index}-${item}`}>{item}</li>
-            ))}
-          </ul>
-        </>
-      ) : null}
-      {!hasUpload && pictures.length > 1 ? (
-        <div className="photo-row" style={{ marginTop: 12 }}>
-          {pictures.map((picture) => (
-            <button
-              key={picture.id}
-              type="button"
-              className="thumb"
-              aria-pressed={picture.id === current?.id}
-              onClick={() => setSelected(picture.id)}
-            >
-              <img src={picture.imageUrl} alt="" />
-            </button>
-          ))}
-        </div>
-      ) : null}
-      {showingUploaded ? null : <p className="meta impression">{copy.impression}</p>}
+      {showingUploaded ? <p className="meta impression">{copy.uploadedAfter}</p> : <p className="meta impression">{copy.impression}</p>}
       {link?.lastFailed ? <p className="warn" style={{ marginTop: 10 }}>{copy.failure}</p> : null}
       {busyZoneId === zone?.id ? <p className="meta">{copy.making}</p> : null}
       {zone && link ? (
-        <>
-          <button
-            id="drift-link"
-            className="text-btn drift-link"
-            type="button"
-            disabled={left === 0}
-            onClick={() => {
-              setKeepDraft(link.keep.join("\n"));
-              setDriftOpen(true);
-            }}
-          >
-            {copy.drift}
+        <button
+          id="drift-link"
+          className="text-btn drift-link"
+          type="button"
+          disabled={left === 0}
+          onClick={() => {
+            setKeepDraft(link.keep.join("\n"));
+            setDriftOpen(true);
+          }}
+        >
+          {copy.drift}
+        </button>
+      ) : null}
+      {zone && link && !driftOpen && !pushOpen ? (
+        <div className="try-row" id="try-row" style={{ marginTop: 8 }}>
+          <button id="try-again" className="btn btn-outline" type="button" disabled={left === 0 || busyZoneId === zone.id} onClick={() => void retry(false)}>
+            {retryLabel}
           </button>
-        </>
+          <span className="meta">{copy.triesLeft(left)}</span>
+        </div>
       ) : null}
 
       {driftOpen || pushOpen || !zone || !link ? null : (
         <ActionBar>
-          <div className="try-row">
-            <button id="try-again" className="btn btn-outline" type="button" disabled={left === 0 || busyZoneId === zone.id} onClick={() => void retry(false)}>
-              {retryLabel}
-            </button>
-            <span className="meta">{copy.triesLeft(left)}</span>
-          </div>
           <button
+            id="approve"
             className="btn btn-primary btn-wide"
             type="button"
             disabled={!current && zonePill(state, plan.id, zone) !== "approved"}

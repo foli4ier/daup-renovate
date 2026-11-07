@@ -35,7 +35,7 @@ img {
 }
 
 .page.has-skip {
-  padding-bottom: calc(380px + env(safe-area-inset-bottom));
+  padding-bottom: calc(280px + env(safe-area-inset-bottom));
 }
 
 .thumb-paths {
@@ -535,7 +535,7 @@ h3 {
   grid-template-columns: 1fr 1fr 1fr;
   background: var(--white);
   border-top: 1px solid var(--line);
-  z-index: 10;
+  z-index: 20;
   padding-bottom: env(safe-area-inset-bottom);
 }
 
@@ -562,10 +562,10 @@ h3 {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(58px + env(safe-area-inset-bottom));
+  bottom: 0;
   width: 100%;
   max-width: 430px;
-  padding: 10px 18px;
+  padding: 10px 18px calc(58px + env(safe-area-inset-bottom));
   background: var(--cream);
   z-index: 12;
   display: flex;

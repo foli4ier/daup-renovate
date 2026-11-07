@@ -5,7 +5,7 @@ import { SUGGESTIONS, STYLE_CHIPS, TIER_CHIPS } from "../data/guides";
 import { unanswered } from "../data/questions";
 import { ABOUT_ONE_MEGAPIXEL, type StyleId, type Tier } from "../lib/prompt";
 import { canOfferAfterUpload } from "../lib/reading";
-import { ActionBar, TopBar } from "../components/Chrome";
+import { TopBar } from "../components/Chrome";
 import { activePlan, linkFor, photosFor } from "../state/select";
 import { useRenovate } from "../state/store";
 
@@ -37,7 +37,6 @@ export default function Capture() {
   const cameraRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
   const afterRef = useRef<HTMLInputElement>(null);
-  const generateRef = useRef<HTMLButtonElement>(null);
   const [style, setStyle] = useState<StyleId | undefined>(link?.style);
   const [styleNote, setStyleNote] = useState(link?.readLine ?? link?.styleNote ?? "");
   const [budget, setBudget] = useState<Tier | undefined>(link?.budget);
@@ -48,7 +47,6 @@ export default function Capture() {
   const [used, setUsed] = useState("");
   const [photoError, setPhotoError] = useState(false);
   const [uploadError, setUploadError] = useState(false);
-  const [pinGenerate, setPinGenerate] = useState(false);
   const suggestions = SUGGESTIONS[zone?.key ?? ""] ?? { keep: [], replace: [] };
   const hasBefore = canOfferAfterUpload(photos.length);
 
@@ -61,19 +59,6 @@ export default function Capture() {
     setUsed("");
     setUploadError(false);
   }, [zoneId]);
-
-  useEffect(() => {
-    const node = generateRef.current;
-    if (!node || !hasBefore) {
-      setPinGenerate(false);
-      return;
-    }
-    const observer = new IntersectionObserver(([entry]) => {
-      setPinGenerate(entry ? !entry.isIntersecting : false);
-    }, { threshold: 0.6 });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [hasBefore, zoneId]);
 
   if (!plan || !zone || !link) {
     return (
@@ -172,7 +157,7 @@ export default function Capture() {
   const making = busyZoneId === zoneId && busyMode === "generate";
 
   return (
-    <div className={`page ${hasBefore ? "has-action" : ""}`}>
+    <div className="page">
       <TopBar title={zone.name} />
       <div className="photo-row">
         {photos.map((photo) => (
@@ -215,38 +200,7 @@ export default function Capture() {
         </div>
       )}
 
-      {hasBefore ? (
-        <div className="thumb-paths">
-          <p className="meta">{copy.sameSpot}</p>
-          <button className="btn btn-outline btn-wide" type="button" disabled={reading} onClick={() => afterRef.current?.click()}>
-            {reading ? copy.reading : copy.uploadAfter}
-          </button>
-          <button
-            ref={generateRef}
-            className="btn btn-primary btn-wide"
-            type="button"
-            disabled={!ready || busyZoneId === zoneId}
-            onClick={() => void onGenerate()}
-          >
-            {making ? copy.making : copy.generate}
-          </button>
-          <input
-            ref={afterRef}
-            className="sr-only"
-            type="file"
-            accept="image/*"
-            onChange={(event) => {
-              void onUploadAfter(event.target.files);
-              event.target.value = "";
-            }}
-          />
-          {!ready ? <p className="meta">{copy.pickStyle}</p> : null}
-          {uploadError ? <p className="warn">{copy.uploadFailed}</p> : null}
-        </div>
-      ) : (
-        <p className="meta">{copy.addPhotos(zone.name)}</p>
-      )}
-
+      {hasBefore ? null : <p className="meta">{copy.addPhotos(zone.name)}</p>}
       <p style={{ marginTop: 16 }}>{copy.tip}</p>
       <p className="meta">{copy.people}</p>
 
@@ -396,8 +350,9 @@ export default function Capture() {
         </button>
       </form>
 
-      {style && budget && state.links.some((item) => item.planId === plan.id && item.zoneId !== zoneId && item.style && item.budget) ? (
+      {style && budget && state.links.some((item) => item.planId === plan.id && item.zoneId !== zoneId) ? (
         <button
+          id="use-style"
           className="choice"
           type="button"
           style={{ width: "100%", marginTop: 16 }}
@@ -412,12 +367,33 @@ export default function Capture() {
       ) : null}
       {used ? <p className="meta">{used}</p> : null}
 
-      {pinGenerate ? (
-        <ActionBar>
-          <button className="btn btn-primary btn-wide" type="button" disabled={!ready || busyZoneId === zoneId} onClick={() => void onGenerate()}>
+      {hasBefore ? (
+        <div className="thumb-paths">
+          <button className="btn btn-outline btn-wide" type="button" disabled={reading} onClick={() => afterRef.current?.click()}>
+            {reading ? copy.reading : copy.uploadAfter}
+          </button>
+          <p className="meta">{copy.sameSpot}</p>
+          <button
+            className="btn btn-primary btn-wide"
+            type="button"
+            disabled={!ready || busyZoneId === zoneId}
+            onClick={() => void onGenerate()}
+          >
             {making ? copy.making : copy.generate}
           </button>
-        </ActionBar>
+          <input
+            ref={afterRef}
+            className="sr-only"
+            type="file"
+            accept="image/*"
+            onChange={(event) => {
+              void onUploadAfter(event.target.files);
+              event.target.value = "";
+            }}
+          />
+          {!ready ? <p className="meta">{copy.pickStyle}</p> : null}
+          {uploadError ? <p className="warn">{copy.uploadFailed}</p> : null}
+        </div>
       ) : null}
     </div>
   );
