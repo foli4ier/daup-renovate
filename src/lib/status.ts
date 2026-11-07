@@ -1,3 +1,4 @@
+import { copy } from "../copy";
 import { triesLeft } from "./prompt";
 
 export type Pill = "needs-photos" | "ready" | "questions" | "review" | "approved" | "skipped";
@@ -77,35 +78,37 @@ export function nextStep(input: {
   zones: NextZone[];
   approvedSent: boolean;
 }): NextStep {
-  if (!input.hasPlan) return { kind: "start", label: "Start a plan." };
+  if (!input.hasPlan) return { kind: "start", label: copy.startPlan };
   if (input.status === "in-project" || input.status === "done") {
-    if (!input.approvedSent) return { kind: "callout", label: "Send zones to CallOut." };
-    return { kind: "project", label: "Open in Project." };
+    if (!input.approvedSent) return { kind: "callout", label: copy.sendNext };
+    return { kind: "project", label: copy.openProject };
   }
   if (input.status === "approved" || input.phasesApproved) {
-    return { kind: "push", label: "Push to Project." };
+    return { kind: "push", label: copy.push };
   }
   const open = input.zones
     .filter((zone) => !zone.hidden)
     .slice()
     .sort((a, b) => {
-      if (a.kind && b.kind && a.kind !== b.kind) return a.kind === "outside" ? -1 : 1;
+      const rank = (kind?: "inside" | "outside") => (kind === "outside" ? 0 : kind === "inside" ? 1 : 2);
+      const byKind = rank(a.kind) - rank(b.kind);
+      if (byKind !== 0) return byKind;
       return a.order - b.order;
     })
     .map((zone) => ({ zone, pill: pillOf(zone.link, zone.beforeCount) }))
     .filter((item) => item.pill !== "approved" && item.pill !== "skipped");
   const first = open[0];
-  if (!first) return { kind: "budget", label: "See budget." };
+  if (!first) return { kind: "budget", label: copy.seeBudget };
   if (first.pill === "needs-photos") {
-    return { kind: "zone", zoneId: first.zone.id, dest: "capture", label: `Add photos to ${first.zone.name}.` };
+    return { kind: "zone", zoneId: first.zone.id, dest: "capture", label: copy.addPhotosTo(first.zone.name) };
   }
   if (first.pill === "questions") {
-    return { kind: "zone", zoneId: first.zone.id, dest: "questions", label: `Answer questions for ${first.zone.name}.` };
+    return { kind: "zone", zoneId: first.zone.id, dest: "questions", label: copy.answerFor(first.zone.name) };
   }
   if (first.pill === "review") {
-    return { kind: "zone", zoneId: first.zone.id, dest: "gallery", label: `Review ${first.zone.name}.` };
+    return { kind: "zone", zoneId: first.zone.id, dest: "gallery", label: copy.review(first.zone.name) };
   }
-  return { kind: "zone", zoneId: first.zone.id, dest: "capture", label: `Generate ${first.zone.name}.` };
+  return { kind: "zone", zoneId: first.zone.id, dest: "capture", label: copy.generateZone(first.zone.name) };
 }
 
 export function triesRemaining(attempts: number): number {

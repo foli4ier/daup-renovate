@@ -4,13 +4,33 @@ import { copy } from "../copy";
 import type { Pill } from "../lib/status";
 import { pillLabel } from "../lib/status";
 
-export function TopBar({ title }: { title?: string }) {
+export function TopBar({
+  title,
+  onTitle,
+  titleOpen,
+  extra,
+}: {
+  title?: string;
+  onTitle?: () => void;
+  titleOpen?: boolean;
+  extra?: ReactNode;
+}) {
   return (
     <div className="topbar">
       <button className="back" type="button" onClick={() => history.back()}>
         {copy.back}
       </button>
-      {title ? <h1 className="app-name">{title}</h1> : null}
+      {title && onTitle ? (
+        <h1 className="zone-heading">
+          <button className="zone-title" type="button" aria-haspopup="dialog" aria-expanded={Boolean(titleOpen)} onClick={onTitle}>
+            {title}
+            <span className="zone-chevron" aria-hidden="true" />
+          </button>
+        </h1>
+      ) : title ? (
+        <h1 className="app-name">{title}</h1>
+      ) : null}
+      {extra}
     </div>
   );
 }

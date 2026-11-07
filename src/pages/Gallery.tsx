@@ -1,33 +1,24 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { copy, galleryRetryLabel } from "../copy";
+import { useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { copy } from "../copy";
 import { styleLabel, tierLabel } from "../data/guides";
 import { ActionBar, BeforeAfter, Sheet, TopBar } from "../components/Chrome";
-import { PushSheet } from "../components/ProjectSheets";
+import { useZonePicker } from "../components/ZoneNav";
 import { whatChanges } from "../lib/changes";
 import { ABOUT_ONE_MEGAPIXEL, triesLeft } from "../lib/prompt";
-import { activePlan, linkFor, photosFor, planNext, proposalsFor, stepHref, visibleZones, zonePill } from "../state/select";
+import { activePlan, linkFor, photosFor, proposalsFor } from "../state/select";
 import { useRenovate } from "../state/store";
 
 export default function Gallery() {
   const { zoneId = "" } = useParams();
+  const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { state, dispatch, generate, busyZoneId } = useRenovate();
+  const { state, dispatch, busyZoneId } = useRenovate();
   const plan = activePlan(state);
-  const scroller = useRef<HTMLDivElement>(null);
-  const [activeId, setActiveId] = useState(zoneId);
-  const [selected, setSelected] = useState<string | null>(null);
+  const picker = useZonePicker(zoneId);
+  const [picked, setPicked] = useState<string | null>(null);
   const [driftOpen, setDriftOpen] = useState(false);
   const [keepDraft, setKeepDraft] = useState("");
-  const [pushOpen, setPushOpen] = useState(false);
-  const slides = plan ? visibleZones(state, plan.propertyId).filter((zone) => proposalsFor(state, plan.id, zone.id).length > 0 || zone.id === zoneId) : [];
-
-  useEffect(() => {
-    const root = scroller.current;
-    if (!root) return;
-    const slide = root.querySelector<HTMLElement>(`[data-zone="${zoneId}"]`);
-    slide?.scrollIntoView({ inline: "start" });
-  }, [zoneId]);
 
   if (!plan) {
     return (
@@ -39,90 +30,58 @@ export default function Gallery() {
   }
 
   const currentPlan = plan;
-  const zone = state.zones.find((item) => item.id === activeId) ?? state.zones.find((item) => item.id === zoneId);
+  const zone = state.zones.find((item) => item.id === zoneId);
   const link = zone ? linkFor(state, plan.id, zone.id) : undefined;
   const pictures = zone ? proposalsFor(state, plan.id, zone.id) : [];
-  const current = pictures.find((item) => item.id === selected) ?? pictures[pictures.length - 1];
+  const requested = params.get("picture");
+  const approvedPicture = pictures.find((item) => item.id === link?.approvedProposalId);
+  const current =
+    pictures.find((item) => item.id === picked) ??
+    pictures.find((item) => item.id === requested) ??
+    approvedPicture ??
+    pictures[pictures.length - 1];
   const before = current ? state.photos.find((photo) => photo.id === current.beforePhotoId) : photosFor(state, zone?.id ?? "")[0];
   const left = triesLeft(link?.attempts ?? 0);
   const hasUpload = pictures.some((item) => item.source === "uploaded");
   const showingUploaded = current?.source === "uploaded";
-  const retryLabel = galleryRetryLabel(link?.attempts ?? 0, hasUpload);
   const fromZone = link?.styleFromZoneId ? state.zones.find((item) => item.id === link.styleFromZoneId) : undefined;
   const changes = link ? whatChanges({ read: link.readLine, keep: link.keep, replace: link.replace }) : [];
   const smallAfter =
     showingUploaded && current?.width && current?.height && current.width * current.height < ABOUT_ONE_MEGAPIXEL
       ? copy.smallAfter(current.width, current.height)
       : "";
-  const next = planNext(state);
+  const showingApproved = Boolean(current && link?.approvedProposalId === current.id);
 
-  function onScroll() {
-    const root = scroller.current;
-    if (!root) return;
-    const slides = [...root.querySelectorAll<HTMLElement>("[data-zone]")];
-    const mid = root.scrollLeft + root.clientWidth / 2;
-    const hit = slides.find((slide) => slide.offsetLeft <= mid && slide.offsetLeft + slide.offsetWidth >= mid);
-    if (hit?.dataset.zone) {
-      setActiveId(hit.dataset.zone);
-      setSelected(null);
-    }
-  }
-
-  function follow(step: typeof next) {
-    if (step.kind === "push") {
-      setPushOpen(true);
-      return;
-    }
-    if (step.kind === "project" && currentPlan.projectUrl) {
-      window.open(currentPlan.projectUrl, "_blank", "noopener,noreferrer");
-      return;
-    }
-    const href = stepHref(step);
-    if (href) navigate(href);
-  }
-
-  async function retry(drift: boolean) {
-    if (!zone || !link || left === 0) return;
-    if (drift) {
-      const keep = keepDraft.split("\n").map((line) => line.trim()).filter(Boolean);
-      dispatch({
-        type: "set-guides",
-        planId: currentPlan.id,
-        zoneId: zone.id,
-        style: link.style,
-        styleNote: link.styleNote,
-        budget: link.budget,
-        keep,
-        replace: link.replace,
-      });
-    }
+  function saveKeepAndOpenCapture() {
+    if (!zone || !link) return;
+    const keep = keepDraft
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    dispatch({
+      type: "set-guides",
+      planId: currentPlan.id,
+      zoneId: zone.id,
+      style: link.style,
+      styleNote: link.styleNote,
+      budget: link.budget,
+      keep,
+      replace: link.replace,
+    });
     setDriftOpen(false);
-    const result = await generate(zone.id, { drift });
-    if (result.ok) setSelected(null);
+    navigate(`/zone/${zone.id}`);
   }
 
   return (
-    <div className={`page ${driftOpen || pushOpen ? "" : "has-skip"}`}>
-      <TopBar title={zone?.name} />
-      <div className="snap" ref={scroller} onScroll={onScroll}>
-        {slides.map((slide) => {
-          const pics = proposalsFor(state, plan.id, slide.id);
-          const chosen = slide.id === zone?.id ? current ?? pics[pics.length - 1] : pics[pics.length - 1];
-          const shot = chosen ? state.photos.find((photo) => photo.id === chosen.beforePhotoId) : undefined;
-          const failed = linkFor(state, plan.id, slide.id)?.lastFailed;
-          return (
-            <section key={slide.id} className="snap-slide" data-zone={slide.id}>
-              {chosen && shot ? (
-                <BeforeAfter before={shot.url} after={chosen.imageUrl} />
-              ) : failed ? (
-                <p className="warn">{copy.failure}</p>
-              ) : (
-                <div className="ph">No picture yet</div>
-              )}
-            </section>
-          );
-        })}
-      </div>
+    <div className={`page ${driftOpen ? "" : "has-skip"}`} {...picker.swipe}>
+      <TopBar title={zone?.name} onTitle={zone ? () => picker.setOpen(true) : undefined} titleOpen={picker.open} />
+      {current && before ? (
+        <BeforeAfter before={before.url} after={current.imageUrl} />
+      ) : link?.lastFailed ? (
+        <p className="warn">{copy.failure}</p>
+      ) : (
+        <div className="ph">No picture yet</div>
+      )}
       {smallAfter ? (
         <p className="photo-warn" style={{ marginTop: 10 }}>
           {smallAfter}
@@ -173,7 +132,7 @@ export default function Gallery() {
           </ul>
         </>
       ) : null}
-      {pictures.length > 1 ? (
+      {pictures.length ? (
         <div className="photo-row" id="proposal-thumbs" style={{ marginTop: 12 }}>
           {pictures.map((picture) => (
             <button
@@ -181,17 +140,27 @@ export default function Gallery() {
               type="button"
               className="thumb"
               aria-pressed={picture.id === current?.id}
-              onClick={() => setSelected(picture.id)}
+              onClick={() => setPicked(picture.id)}
             >
               <img src={picture.imageUrl} alt={picture.source === "uploaded" ? "Uploaded after" : "Generated after"} />
             </button>
           ))}
         </div>
       ) : null}
+      {zone && link && !driftOpen ? (
+        <div className="quiet-pair" id="gallery-actions">
+          <button id="add-photos" className="btn btn-outline" type="button" onClick={() => navigate(`/zone/${zone.id}`)}>
+            {copy.addPhotos}
+          </button>
+          <button id="try-again" className="btn btn-outline" type="button" onClick={() => navigate(`/zone/${zone.id}`)}>
+            {copy.tryAgain}
+          </button>
+        </div>
+      ) : null}
       {showingUploaded ? <p className="meta impression">{copy.uploadedAfter}</p> : <p className="meta impression">{copy.impression}</p>}
       {link?.lastFailed ? <p className="warn" style={{ marginTop: 10 }}>{copy.failure}</p> : null}
       {busyZoneId === zone?.id ? <p className="meta">{copy.making}</p> : null}
-      {zone && link ? (
+      {zone && link && !driftOpen ? (
         <button
           id="drift-link"
           className="text-btn drift-link"
@@ -205,32 +174,21 @@ export default function Gallery() {
           {copy.drift}
         </button>
       ) : null}
-      {zone && link && !driftOpen && !pushOpen ? (
-        <div className="try-row" id="try-row" style={{ marginTop: 8 }}>
-          <button id="try-again" className="btn btn-outline" type="button" disabled={left === 0 || busyZoneId === zone.id} onClick={() => void retry(false)}>
-            {retryLabel}
-          </button>
-          <span className="meta">{copy.triesLeft(left)}</span>
-        </div>
-      ) : null}
 
-      {driftOpen || pushOpen || !zone || !link ? null : (
+      {driftOpen || !zone || !link ? null : (
         <ActionBar>
           <button
             id="approve"
             className="btn btn-primary btn-wide"
             type="button"
-            disabled={!current && zonePill(state, plan.id, zone) !== "approved"}
+            disabled={!current}
+            aria-pressed={showingApproved}
             onClick={() => {
-              if (current && link.approvedProposalId === current.id) {
-                follow(next);
-                return;
-              }
-              if (!current) return;
+              if (!current || showingApproved) return;
               dispatch({ type: "approve", planId: plan.id, zoneId: zone.id, proposalId: current.id });
             }}
           >
-            {current && link.approvedProposalId === current.id ? next.label : copy.approve}
+            {showingApproved ? copy.approved : copy.approve}
           </button>
           <button
             className="text-btn"
@@ -250,12 +208,9 @@ export default function Gallery() {
           title={copy.drift}
           onClose={() => setDriftOpen(false)}
           footer={
-            <div className="try-row">
-              <button className="btn btn-primary" type="button" disabled={left === 0} onClick={() => void retry(true)}>
-                {retryLabel}
-              </button>
-              <span className="meta">{copy.triesLeft(left)}</span>
-            </div>
+            <button id="drift-try" className="btn btn-primary btn-wide" type="button" onClick={saveKeepAndOpenCapture}>
+              {copy.tryAgain}
+            </button>
           }
         >
           <p className="meta">Keep is filled in for the next try.</p>
@@ -265,8 +220,7 @@ export default function Gallery() {
           </label>
         </Sheet>
       ) : null}
-      {pushOpen ? <PushSheet onClose={() => setPushOpen(false)} /> : null}
-      {before ? <span className="sr-only">{before.url}</span> : null}
+      {picker.picker}
     </div>
   );
 }

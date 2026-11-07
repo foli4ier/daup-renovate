@@ -74,6 +74,7 @@ h3 {
 .topbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   min-height: 52px;
   margin-bottom: 8px;
@@ -218,6 +219,57 @@ h3 {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-top: 14px;
+}
+
+.add-zone {
+  margin-top: 16px;
+  min-height: 48px;
+}
+
+.zone-heading {
+  margin: 0;
+  min-width: 0;
+  font-size: inherit;
+}
+
+.zone-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.03em;
+  text-align: left;
+}
+
+.zone-chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  flex: 0 0 auto;
+}
+
+.see-afters {
+  margin-left: auto;
+  min-height: 48px;
+}
+
+.quiet-pair {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.quiet-pair .btn {
+  flex: 1 1 0;
+  min-height: 48px;
 }
 
 .zone-tile {
