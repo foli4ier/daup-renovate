@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { copy, galleryRetryLabel } from "../copy";
+import { copy } from "../copy";
 import { styleLabel, tierLabel } from "../data/guides";
 import { ActionBar, BeforeAfter, Sheet, TopBar } from "../components/Chrome";
 import { useZonePicker } from "../components/ZoneNav";
@@ -13,7 +13,7 @@ export default function Gallery() {
   const { zoneId = "" } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { state, dispatch, generate, busyZoneId } = useRenovate();
+  const { state, dispatch, busyZoneId } = useRenovate();
   const plan = activePlan(state);
   const picker = useZonePicker(zoneId);
   const [picked, setPicked] = useState<string | null>(null);
@@ -44,7 +44,6 @@ export default function Gallery() {
   const left = triesLeft(link?.attempts ?? 0);
   const hasUpload = pictures.some((item) => item.source === "uploaded");
   const showingUploaded = current?.source === "uploaded";
-  const retryLabel = galleryRetryLabel(link?.attempts ?? 0, hasUpload);
   const fromZone = link?.styleFromZoneId ? state.zones.find((item) => item.id === link.styleFromZoneId) : undefined;
   const changes = link ? whatChanges({ read: link.readLine, keep: link.keep, replace: link.replace }) : [];
   const smallAfter =
@@ -53,27 +52,24 @@ export default function Gallery() {
       : "";
   const showingApproved = Boolean(current && link?.approvedProposalId === current.id);
 
-  async function retry(drift: boolean) {
-    if (!zone || !link || left === 0) return;
-    if (drift) {
-      const keep = keepDraft
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean);
-      dispatch({
-        type: "set-guides",
-        planId: currentPlan.id,
-        zoneId: zone.id,
-        style: link.style,
-        styleNote: link.styleNote,
-        budget: link.budget,
-        keep,
-        replace: link.replace,
-      });
-    }
+  function saveKeepAndOpenCapture() {
+    if (!zone || !link) return;
+    const keep = keepDraft
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    dispatch({
+      type: "set-guides",
+      planId: currentPlan.id,
+      zoneId: zone.id,
+      style: link.style,
+      styleNote: link.styleNote,
+      budget: link.budget,
+      keep,
+      replace: link.replace,
+    });
     setDriftOpen(false);
-    const result = await generate(zone.id, { drift });
-    if (result.ok) setPicked(result.proposalId);
+    navigate(`/zone/${zone.id}`);
   }
 
   return (
@@ -212,12 +208,9 @@ export default function Gallery() {
           title={copy.drift}
           onClose={() => setDriftOpen(false)}
           footer={
-            <div className="try-row">
-              <button className="btn btn-primary" type="button" disabled={left === 0} onClick={() => void retry(true)}>
-                {retryLabel}
-              </button>
-              <span className="meta">{copy.triesLeft(left)}</span>
-            </div>
+            <button id="drift-try" className="btn btn-primary btn-wide" type="button" onClick={saveKeepAndOpenCapture}>
+              {copy.tryAgain}
+            </button>
           }
         >
           <p className="meta">Keep is filled in for the next try.</p>
