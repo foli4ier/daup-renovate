@@ -1,3 +1,5 @@
+import { usableRead } from "./reading";
+
 const CHANGES: Record<string, string> = {
   "Beige paint": "Repaint the beige walls.",
   "Brown garage door": "Refinish the garage door.",
@@ -14,11 +16,21 @@ const CHANGES: Record<string, string> = {
   "Dark carpet": "Replace the dark carpet with vinyl plank.",
 };
 
-export function whatChanges(items: string[]): string[] {
-  return items.map((item) => {
-    const known = CHANGES[item];
-    if (known) return known;
-    const sentence = item.endsWith(".") ? item : `${item}.`;
-    return sentence.charAt(0).toUpperCase() + sentence.slice(1);
-  });
+function sentence(item: string): string {
+  const known = CHANGES[item];
+  if (known) return known;
+  const line = item.endsWith(".") ? item : `${item}.`;
+  return line.charAt(0).toUpperCase() + line.slice(1);
+}
+
+export function whatChanges(input: { read?: string; keep?: string[]; replace: string[] }): string[] {
+  const lines: string[] = [];
+  const read = usableRead(input.read);
+  if (read) lines.push(sentence(read));
+  for (const item of input.replace) lines.push(sentence(item));
+  for (const item of input.keep ?? []) {
+    const named = item.replace(/^keep\s+/i, "");
+    lines.push(sentence(named.toLowerCase().startsWith("keep ") ? named : `Keep ${named}`));
+  }
+  return lines;
 }

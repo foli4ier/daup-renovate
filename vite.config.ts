@@ -73,6 +73,16 @@ function attach(server: { middlewares: Connect.Server }, allowMock: boolean) {
       send(res, 200, { ok: true, ai: false });
       return;
     }
+    if (url.startsWith("/api/describe") && req.method === "POST") {
+      try {
+        await readBody(req);
+      } catch {
+        send(res, 400, { ok: false });
+        return;
+      }
+      send(res, 200, { ok: false, code: "unavailable" });
+      return;
+    }
     if (url.startsWith("/api/generate") && req.method === "POST") {
       try {
         const raw = await readBody(req);

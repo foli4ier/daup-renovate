@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useReducer, useRef, useState, type ReactNode } from "react";
 import { calloutSource } from "../api/callout";
 import { ServiceUnreachable } from "../api/errors";
+import { describeAfter } from "../api/describe";
 import { generateImage } from "../api/images";
 import { projectSource } from "../api/project";
 import { loadProperties, type PropertyQuery } from "../api/property";
@@ -10,7 +11,9 @@ import { captureHubHandoff, type HubHandoff } from "../lib/handoff";
 import { unmatchedHouseName } from "../lib/properties";
 import { locateLeak, type LeakSpot } from "../lib/leak";
 import { assessTotal } from "../lib/budget";
+import { SUGGESTIONS } from "../data/guides";
 import { capReached, type StyleId, type Tier } from "../lib/prompt";
+import { canOfferAfterUpload, READ_FALLBACK } from "../lib/reading";
 import { reduce, type Action } from "./reducer";
 import { activePlan, activeProperty, budgetLines, linkFor, photosFor, proposalsFor, scopeFor, starredPhoto } from "./select";
 import type { CalloutRequest, Photo, State, Zone, ZoneKind } from "./types";
@@ -22,12 +25,14 @@ type StoreValue = {
   propertyLoad: PropertyLoad;
   unmatchedHouse: string;
   busyZoneId: string | null;
+  busyMode: "generate" | "read" | null;
   dispatch: (action: Action) => void;
   reloadProperties: () => void;
   chooseProperty: (propertyId: string) => void;
   startPlan: (name: string) => void;
   addPhoto: (photo: Photo) => void;
   saveGuides: (zoneId: string, guides: { style?: StyleId; styleNote?: string; budget?: Tier; keep: string[]; replace: string[] }) => void;
+  uploadAfter: (zoneId: string, photo: { url: string; width: number; height: number }) => Promise<{ ok: boolean }>;
   generate: (zoneId: string, options?: { drift?: boolean }) => Promise<{ ok: boolean }>;
   pushProject: () => Promise<{ ok: true; url: string } | { ok: false }>;
   sendCallouts: (zoneIds: string[]) => Promise<{ ok: boolean; blocked: boolean; spots: (LeakSpot & { zoneId: string; zoneName: string })[] }>;
@@ -84,6 +89,7 @@ function load(): State {
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, rawDispatch] = useReducer(reduce, undefined, load);
   const [busyZoneId, setBusyZoneId] = useState<string | null>(null);
+  const [busyMode, setBusyMode] = useState<"generate" | "read" | null>(null);
   const [propertyLoad, setPropertyLoad] = useState<PropertyLoad>(sampleRequested() ? "ready" : "loading");
   const [unmatchedHouse, setUnmatchedHouse] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
@@ -159,6 +165,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       propertyLoad,
       unmatchedHouse,
       busyZoneId,
+      busyMode,
       dispatch,
       reloadProperties() {
         setReloadKey((value) => value + 1);
@@ -192,6 +199,45 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!plan) return;
         dispatch({ type: "set-guides", planId: plan.id, zoneId, ...guides });
       },
+      async uploadAfter(zoneId, photo) {
+        const current = ref.current;
+        const plan = activePlan(current);
+        const zone = current.zones.find((item) => item.id === zoneId);
+        const photos = photosFor(current, zoneId);
+        if (!plan || !zone || !canOfferAfterUpload(photos.length)) return { ok: false };
+        const before = starredPhoto(photos);
+        if (!before) return { ok: false };
+        setBusyZoneId(zoneId);
+        setBusyMode("read");
+        const suggestions = SUGGESTIONS[zone.key] ?? { keep: [], replace: [] };
+        const reading = await describeAfter({
+          beforeUrl: before.url,
+          afterUrl: photo.url,
+          zoneName: zone.name,
+          keepSuggestions: suggestions.keep,
+          replaceSuggestions: suggestions.replace,
+        });
+        dispatch({
+          type: "upload-ok",
+          proposal: {
+            id: `proposal_${crypto.randomUUID()}`,
+            planId: plan.id,
+            zoneId,
+            beforePhotoId: before.id,
+            imageUrl: photo.url,
+            createdAt: new Date().toISOString(),
+            source: "uploaded",
+            width: photo.width,
+            height: photo.height,
+          },
+          description: reading.ok ? reading.reading.description : READ_FALLBACK,
+          keep: reading.ok ? reading.reading.keep : [],
+          replace: reading.ok ? reading.reading.replace : [],
+        });
+        setBusyZoneId(null);
+        setBusyMode(null);
+        return { ok: true };
+      },
       async generate(zoneId, options) {
         const current = ref.current;
         const plan = activePlan(current);
@@ -202,11 +248,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const photo = starredPhoto(photosFor(current, zoneId));
         if (!photo) return { ok: false };
         if (!link.style || !link.budget) return { ok: false };
+        const reference =
+          link.style === "from-after" && link.styleReferenceProposalId
+            ? current.proposals.find((item) => item.id === link.styleReferenceProposalId)
+            : undefined;
         setBusyZoneId(zoneId);
+        setBusyMode("generate");
         const result = await generateImage({
           zoneName: zone.name,
           style: link.style,
-          styleNote: link.styleNote,
+          styleNote: link.style === "from-after" ? link.readLine || link.styleNote : link.styleNote,
           budget: link.budget,
           keep: link.keep,
           replace: link.replace,
@@ -215,8 +266,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           attemptsUsed: link.attempts,
           beforePhotoId: photo.id,
           imageUrl: photo.url,
+          styleImageUrl: reference?.imageUrl,
         });
         setBusyZoneId(null);
+        setBusyMode(null);
         if (!result.ok) {
           dispatch({ type: "generate-failed", planId: plan.id, zoneId });
           return { ok: false };
@@ -230,6 +283,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             beforePhotoId: photo.id,
             imageUrl: result.imageUrl,
             createdAt: new Date().toISOString(),
+            source: "generated",
           },
         });
         return { ok: true };

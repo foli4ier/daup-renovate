@@ -1,9 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { copy } from "../copy";
 import { SUGGESTIONS, STYLE_CHIPS, TIER_CHIPS } from "../data/guides";
 import { unanswered } from "../data/questions";
 import { ABOUT_ONE_MEGAPIXEL, type StyleId, type Tier } from "../lib/prompt";
+import { canOfferAfterUpload } from "../lib/reading";
 import { ActionBar, TopBar } from "../components/Chrome";
 import { activePlan, linkFor, photosFor } from "../state/select";
 import { useRenovate } from "../state/store";
@@ -28,15 +29,17 @@ function measure(file: File): Promise<{ url: string; width: number; height: numb
 export default function Capture() {
   const { zoneId = "" } = useParams();
   const navigate = useNavigate();
-  const { state, dispatch, addPhoto, saveGuides, generate, busyZoneId } = useRenovate();
+  const { state, dispatch, addPhoto, saveGuides, uploadAfter, generate, busyZoneId, busyMode } = useRenovate();
   const plan = activePlan(state);
   const zone = state.zones.find((item) => item.id === zoneId);
   const link = plan ? linkFor(state, plan.id, zoneId) : undefined;
   const photos = photosFor(state, zoneId);
   const cameraRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
+  const afterRef = useRef<HTMLInputElement>(null);
+  const generateRef = useRef<HTMLButtonElement>(null);
   const [style, setStyle] = useState<StyleId | undefined>(link?.style);
-  const [styleNote, setStyleNote] = useState(link?.styleNote ?? "");
+  const [styleNote, setStyleNote] = useState(link?.readLine ?? link?.styleNote ?? "");
   const [budget, setBudget] = useState<Tier | undefined>(link?.budget);
   const [keep, setKeep] = useState<string[]>(link?.keep ?? []);
   const [replace, setReplace] = useState<string[]>(link?.replace ?? []);
@@ -44,7 +47,33 @@ export default function Capture() {
   const [ownReplace, setOwnReplace] = useState("");
   const [used, setUsed] = useState("");
   const [photoError, setPhotoError] = useState(false);
+  const [uploadError, setUploadError] = useState(false);
+  const [pinGenerate, setPinGenerate] = useState(false);
   const suggestions = SUGGESTIONS[zone?.key ?? ""] ?? { keep: [], replace: [] };
+  const hasBefore = canOfferAfterUpload(photos.length);
+
+  useEffect(() => {
+    setStyle(link?.style);
+    setStyleNote(link?.readLine ?? link?.styleNote ?? "");
+    setBudget(link?.budget);
+    setKeep(link?.keep ?? []);
+    setReplace(link?.replace ?? []);
+    setUsed("");
+    setUploadError(false);
+  }, [zoneId]);
+
+  useEffect(() => {
+    const node = generateRef.current;
+    if (!node || !hasBefore) {
+      setPinGenerate(false);
+      return;
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      setPinGenerate(entry ? !entry.isIntersecting : false);
+    }, { threshold: 0.6 });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasBefore, zoneId]);
 
   if (!plan || !zone || !link) {
     return (
@@ -58,6 +87,14 @@ export default function Capture() {
   const currentPlan = plan;
   const currentZone = zone;
   const currentLink = link;
+  const fromZone = currentLink.styleFromZoneId
+    ? state.zones.find((item) => item.id === currentLink.styleFromZoneId)
+    : undefined;
+  const hasUpload = state.proposals.some(
+    (item) => item.planId === currentPlan.id && item.zoneId === zoneId && item.source === "uploaded",
+  );
+  const showFrom = hasUpload || style === "from-after" || Boolean(currentLink.styleFromZoneId);
+  const fromLabel = currentLink.styleFromZoneId && fromZone ? copy.fromZone(fromZone.name) : copy.fromYourAfter;
 
   function persist(next?: { style?: StyleId; styleNote?: string; budget?: Tier; keep?: string[]; replace?: string[] }) {
     saveGuides(zoneId, {
@@ -90,6 +127,26 @@ export default function Capture() {
     });
   }
 
+  async function onUploadAfter(list: FileList | null) {
+    const file = list?.[0];
+    if (!file) return;
+    if (!canOfferAfterUpload(photos.length)) return;
+    setUploadError(false);
+    let measured: { url: string; width: number; height: number };
+    try {
+      measured = await measure(file);
+    } catch {
+      setUploadError(true);
+      return;
+    }
+    const result = await uploadAfter(zoneId, measured);
+    if (!result.ok) {
+      setUploadError(true);
+      return;
+    }
+    navigate(`/gallery/${zoneId}`);
+  }
+
   function toggle(list: string[], value: string, kind: "keep" | "replace") {
     const next = list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
     if (kind === "keep") setKeep(next);
@@ -111,9 +168,11 @@ export default function Capture() {
 
   const ready = Boolean(style && (style !== "custom" || styleNote.trim()) && budget && photos.length);
   const small = photos.filter((photo) => photo.width * photo.height < ABOUT_ONE_MEGAPIXEL);
+  const reading = busyZoneId === zoneId && busyMode === "read";
+  const making = busyZoneId === zoneId && busyMode === "generate";
 
   return (
-    <div className="page has-action">
+    <div className={`page ${hasBefore ? "has-action" : ""}`}>
       <TopBar title={zone.name} />
       <div className="photo-row">
         {photos.map((photo) => (
@@ -155,11 +214,59 @@ export default function Capture() {
           <input ref={uploadRef} className="sr-only" type="file" accept="image/*" onChange={(event) => void addFiles(event.target.files)} />
         </div>
       )}
+
+      {hasBefore ? (
+        <div className="thumb-paths">
+          <p className="meta">{copy.sameSpot}</p>
+          <button className="btn btn-outline btn-wide" type="button" disabled={reading} onClick={() => afterRef.current?.click()}>
+            {reading ? copy.reading : copy.uploadAfter}
+          </button>
+          <button
+            ref={generateRef}
+            className="btn btn-primary btn-wide"
+            type="button"
+            disabled={!ready || busyZoneId === zoneId}
+            onClick={() => void onGenerate()}
+          >
+            {making ? copy.making : copy.generate}
+          </button>
+          <input
+            ref={afterRef}
+            className="sr-only"
+            type="file"
+            accept="image/*"
+            onChange={(event) => {
+              void onUploadAfter(event.target.files);
+              event.target.value = "";
+            }}
+          />
+          {!ready ? <p className="meta">{copy.pickStyle}</p> : null}
+          {uploadError ? <p className="warn">{copy.uploadFailed}</p> : null}
+        </div>
+      ) : (
+        <p className="meta">{copy.addPhotos(zone.name)}</p>
+      )}
+
       <p style={{ marginTop: 16 }}>{copy.tip}</p>
       <p className="meta">{copy.people}</p>
 
       <h2 style={{ marginTop: 22 }}>Style</h2>
       <div className="chips" style={{ marginTop: 8 }}>
+        {showFrom ? (
+          <button
+            type="button"
+            className="choice"
+            aria-pressed={style === "from-after"}
+            onClick={() => {
+              setStyle("from-after");
+              const note = currentLink.readLine ?? currentLink.styleNote ?? styleNote;
+              setStyleNote(note);
+              persist({ style: "from-after", styleNote: note });
+            }}
+          >
+            {fromLabel}
+          </button>
+        ) : null}
         {STYLE_CHIPS.map((chip) => (
           <button
             key={chip.id}
@@ -186,6 +293,23 @@ export default function Capture() {
           {copy.describe}
         </button>
       </div>
+      {style === "from-after" ? (
+        <label className="field">
+          {copy.whatWeRead}
+          <textarea
+            className="read-line"
+            rows={3}
+            value={styleNote}
+            aria-label={copy.whatWeRead}
+            onChange={(event) => {
+              const text = event.target.value;
+              setStyleNote(text);
+              if (currentLink.styleFromZoneId) persist({ style: "from-after", styleNote: text });
+              else dispatch({ type: "set-read-line", planId: currentPlan.id, zoneId, text });
+            }}
+          />
+        </label>
+      ) : null}
       {style === "custom" ? (
         <label className="field">
           Your words
@@ -287,13 +411,14 @@ export default function Capture() {
         </button>
       ) : null}
       {used ? <p className="meta">{used}</p> : null}
-      {!ready ? <p className="meta">{photos.length ? copy.pickStyle : copy.addPhotos(zone.name)}</p> : null}
 
-      <ActionBar>
-        <button className="btn btn-primary btn-wide" type="button" disabled={!ready || busyZoneId === zoneId} onClick={() => void onGenerate()}>
-          {busyZoneId === zoneId ? copy.making : copy.generate}
-        </button>
-      </ActionBar>
+      {pinGenerate ? (
+        <ActionBar>
+          <button className="btn btn-primary btn-wide" type="button" disabled={!ready || busyZoneId === zoneId} onClick={() => void onGenerate()}>
+            {making ? copy.making : copy.generate}
+          </button>
+        </ActionBar>
+      ) : null}
     </div>
   );
 }

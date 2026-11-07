@@ -24,7 +24,18 @@ export const copy = {
   close: "Close.",
   takePhoto: "Take a photo.",
   uploadPhoto: "Upload a photo.",
+  uploadAfter: "Upload an after.",
   useStyle: "Use this style and budget on the other zones.",
+  useLook: "Use this style on the other zones.",
+  useLookHelp: "Other zones will follow this look when they generate. You can still change a zone that should differ. Budgets stay on each zone.",
+  fromYourAfter: "From your after.",
+  fromZone: (name: string) => `From ${name}.`,
+  whatWeRead: "What we read",
+  uploadedAfter: "This is the after you uploaded.",
+  generateAfter: "Generate an after.",
+  sameSpot: "Use a picture from the same spot as your main photo.",
+  uploadFailed: "We could not add that picture. Your befores are safe – try again.",
+  reading: "Reading the picture…",
   describe: "Describe it yourself.",
   typeAnswer: "Type an answer.",
   addOwn: "Add.",
@@ -104,7 +115,14 @@ export const copy = {
   zoneScore: (total: number, approved: number) => `${total} zones · ${approved} approved`,
   smallPhoto: (width: number, height: number) =>
     `This photo is small (${width} × ${height}). The new picture will look soft – retake if you can.`,
+  smallAfter: (width: number, height: number) =>
+    `This picture is small (${width} × ${height}). It will look soft – use it anyway if that is what you have.`,
   aboutDays: (days: number) => `About ${days} ${days === 1 ? "day" : "days"}.`,
   startsAfter: (names: string[]) => (names.length ? `Starts after ${names.join(" and ")}.` : "Starts first."),
   mergeAsk: (source: string, target: string) => `Merge ${source} into ${target}?`,
 };
+
+export function galleryRetryLabel(attempts: number, hasUpload: boolean): string {
+  if (hasUpload && attempts === 0) return copy.generateAfter;
+  return copy.tryAgain;
+}

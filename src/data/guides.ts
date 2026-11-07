@@ -12,7 +12,8 @@ export const TIER_CHIPS: { id: Tier; label: string; hint: string }[] = [
   { id: "high", label: "High.", hint: "Bigger changes" },
 ];
 
-export function styleLabel(style: StyleId, note?: string): string {
+export function styleLabel(style: StyleId, note?: string, fromZone?: string): string {
+  if (style === "from-after") return fromZone ? `From ${fromZone}.` : "From your after.";
   if (style === "custom") return note?.trim() || "Your description";
   return STYLE_CHIPS.find((chip) => chip.id === style)?.label ?? "Style";
 }

@@ -3,7 +3,9 @@ import { pickPropertyId, type PropertyPrefer } from "../lib/properties";
 import { freshPhases } from "../data/phases";
 import { emptyState } from "../data/seed";
 import { defaultZones } from "../data/zones";
+import { withSharedLook } from "../lib/look";
 import type { StyleId, Tier } from "../lib/prompt";
+import { canOfferAfterUpload } from "../lib/reading";
 import { emptyLink, type CalloutRequest, type Photo, type Plan, type Proposal, type State, type Zone, type ZoneKind } from "./types";
 
 const PHOTO_CAP = 6;
@@ -26,6 +28,9 @@ export type Action =
   | { type: "remove-photo"; photoId: string }
   | { type: "set-guides"; planId: string; zoneId: string; style?: StyleId; styleNote?: string; budget?: Tier; keep: string[]; replace: string[] }
   | { type: "apply-style"; planId: string; zoneId: string }
+  | { type: "upload-ok"; proposal: Proposal; description: string; keep: string[]; replace: string[] }
+  | { type: "share-look"; planId: string; zoneId: string; on: boolean }
+  | { type: "set-read-line"; planId: string; zoneId: string; text: string }
   | { type: "add-keep"; planId: string; zoneId: string; text: string }
   | { type: "save-answer"; zoneId: string; questionId: string; text: string }
   | { type: "questions-pending"; planId: string; zoneId: string; pending: boolean }
@@ -38,6 +43,19 @@ export type Action =
   | { type: "approve-plan"; planId: string }
   | { type: "pushed"; planId: string; projectId: string; projectUrl: string }
   | { type: "sent"; requests: CalloutRequest[] };
+
+function unique(items: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of items) {
+    const text = item.trim();
+    const key = text.toLowerCase();
+    if (!text || seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+  }
+  return out;
+}
 
 function mapLink(state: State, planId: string, zoneId: string, edit: (link: State["links"][number]) => State["links"][number]): State {
   return {
@@ -215,12 +233,83 @@ export function reduce(state: State, action: Action): State {
     case "apply-style": {
       const source = state.links.find((link) => link.planId === action.planId && link.zoneId === action.zoneId);
       if (!source?.style || !source.budget) return state;
+      const fromAfter = source.style === "from-after";
+      const note = fromAfter ? source.readLine || source.styleNote : source.styleNote;
       return {
         ...state,
         links: state.links.map((link) => {
           if (link.planId !== action.planId || link.zoneId === action.zoneId) return link;
           if (link.approvedProposalId || link.skipped) return link;
-          return { ...link, style: source.style, styleNote: source.styleNote, budget: source.budget };
+          if (fromAfter) {
+            return {
+              ...link,
+              style: source.style,
+              styleNote: note,
+              budget: source.budget,
+              styleFromZoneId: action.zoneId,
+              styleReferenceProposalId: source.styleReferenceProposalId,
+            };
+          }
+          return {
+            ...link,
+            style: source.style,
+            styleNote: source.styleNote,
+            budget: source.budget,
+            styleFromZoneId: undefined,
+            styleReferenceProposalId: undefined,
+          };
+        }),
+      };
+    }
+    case "upload-ok": {
+      if (!canOfferAfterUpload(state.photos.filter((photo) => photo.zoneId === action.proposal.zoneId).length)) return state;
+      if (action.proposal.source !== "uploaded") return state;
+      if (state.proposals.some((item) => item.id === action.proposal.id)) return state;
+      const stored: State = {
+        ...state,
+        proposals: [...state.proposals, action.proposal],
+      };
+      const described = mapLink(stored, action.proposal.planId, action.proposal.zoneId, (link) => ({
+        ...link,
+        style: "from-after",
+        styleNote: action.description,
+        readLine: action.description,
+        keep: unique([...link.keep, ...action.keep]),
+        replace: unique([...link.replace, ...action.replace]),
+        proposalIds: [...link.proposalIds, action.proposal.id],
+        styleFromZoneId: undefined,
+        styleReferenceProposalId: action.proposal.id,
+        shareLook: true,
+        lastFailed: false,
+        questionsPending: false,
+        skipped: false,
+      }));
+      return {
+        ...described,
+        links: withSharedLook(described.links, action.proposal.planId, action.proposal.zoneId, true),
+      };
+    }
+    case "share-look":
+      return {
+        ...state,
+        links: withSharedLook(state.links, action.planId, action.zoneId, action.on),
+      };
+    case "set-read-line": {
+      const source = state.links.find((link) => link.planId === action.planId && link.zoneId === action.zoneId);
+      return {
+        ...state,
+        links: state.links.map((link) => {
+          if (link.planId === action.planId && link.zoneId === action.zoneId) {
+            return {
+              ...link,
+              readLine: action.text,
+              styleNote: link.style === "from-after" ? action.text : link.styleNote,
+            };
+          }
+          if (source?.shareLook && link.planId === action.planId && link.style === "from-after" && link.styleFromZoneId === action.zoneId) {
+            return { ...link, styleNote: action.text };
+          }
+          return link;
         }),
       };
     }
