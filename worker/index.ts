@@ -1,4 +1,5 @@
 import { DEFAULT_SEED_ORIGIN } from "../src/lib/propertyLoad";
+import { PROPERTY_LIST_URL } from "../src/lib/properties";
 import { handlePropertyPost } from "../src/lib/propertyRoute";
 import { buildEditPrompt, capReached, MODEL_KLEIN, type PromptInput } from "../src/lib/prompt";
 
@@ -157,7 +158,7 @@ async function properties(request: Request, env: Env): Promise<Response> {
     cookie: request.headers.get("cookie"),
     secure: new URL(request.url).protocol === "https:",
     seedOrigin: env.HOUSE_SEED_URL || DEFAULT_SEED_ORIGIN,
-    propertyUrl: env.PROPERTY_URL || "",
+    propertyUrl: env.PROPERTY_URL || PROPERTY_LIST_URL,
     allowMock: false,
     envMock: false,
   });

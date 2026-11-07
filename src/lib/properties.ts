@@ -3,7 +3,15 @@ export type DaupProperty = {
   name: string;
   suburb: string;
   ownerId: string;
+  /** Property’s own place id. Not the Hub place id. */
+  placeId?: string;
+  /** Hub place id stored on the unit. */
+  externalPlaceId?: string;
+  /** Hub house name stored on the unit. */
+  placeName?: string;
 };
+
+export const PROPERTY_LIST_URL = "https://property.daup.co.za/api/properties";
 
 export type PropertyPrefer = {
   houseHint: string;
@@ -17,18 +25,31 @@ export function hinted(prefer: PropertyPrefer | undefined): boolean {
   return Boolean(prefer.houseHint.trim() || prefer.placeIdHints.some((id) => id.trim()));
 }
 
-/** Place id wins, then the house name. A hint is never turned into a property. */
-export function matchProperty<T extends { id: string; name: string }>(
-  properties: T[],
-  prefer: PropertyPrefer | undefined,
-): T | undefined {
+type Matchable = {
+  id: string;
+  name: string;
+  externalPlaceId?: string;
+  placeName?: string;
+};
+
+/**
+ * Hub place id against id or externalPlaceId, then house name against name or placeName.
+ * The first hit wins. A hint that misses is not turned into a property.
+ */
+export function matchProperty<T extends Matchable>(properties: T[], prefer: PropertyPrefer | undefined): T | undefined {
   if (!prefer) return undefined;
   const ids = new Set(prefer.placeIdHints.map((id) => id.trim()).filter(Boolean));
-  const byId = properties.find((property) => ids.has(property.id));
-  if (byId) return byId;
+  if (ids.size) {
+    const byId = properties.find((property) => ids.has(property.id) || ids.has((property.externalPlaceId || "").trim()));
+    if (byId) return byId;
+  }
   const house = prefer.houseHint.trim().toLowerCase();
   if (!house) return undefined;
-  return properties.find((property) => property.name.trim().toLowerCase() === house);
+  return properties.find((property) => {
+    const name = property.name.trim().toLowerCase();
+    const placeName = (property.placeName || "").trim().toLowerCase();
+    return name === house || placeName === house;
+  });
 }
 
 export function pickPropertyId(
@@ -54,6 +75,12 @@ export function unmatchedHouseName(
   return prefer.houseHint.trim() || "that house";
 }
 
+function optionalId(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
 export function normalizeProperty(value: unknown): DaupProperty | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
@@ -62,10 +89,17 @@ export function normalizeProperty(value: unknown): DaupProperty | null {
   if (!id || !name) return null;
   const suburb = typeof record.suburb === "string" ? record.suburb.trim() : "";
   const ownerId = typeof record.ownerId === "string" ? record.ownerId.trim() : "";
-  return { id, name, suburb, ownerId };
+  const property: DaupProperty = { id, name, suburb, ownerId };
+  const placeId = optionalId(record.placeId);
+  const externalPlaceId = optionalId(record.externalPlaceId);
+  const placeName = optionalId(record.placeName);
+  if (placeId) property.placeId = placeId;
+  if (externalPlaceId) property.externalPlaceId = externalPlaceId;
+  if (placeName) property.placeName = placeName;
+  return property;
 }
 
-/** Accepts the list shape Renovate already documents. Hub place records are not properties. */
+/** `{ properties: [...] }` from DAUP Property. A bare array is accepted. Unknown fields are ignored. */
 export function readPropertyList(data: unknown): DaupProperty[] | null {
   let list: unknown[] | null = null;
   if (Array.isArray(data)) list = data;

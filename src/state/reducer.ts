@@ -62,6 +62,9 @@ export function reduce(state: State, action: Action): State {
         suburb: property.suburb,
         ownerId: property.ownerId,
         coverPhotoId: state.properties.find((item) => item.id === property.id)?.coverPhotoId ?? "",
+        ...(property.placeId ? { placeId: property.placeId } : {}),
+        ...(property.externalPlaceId ? { externalPlaceId: property.externalPlaceId } : {}),
+        ...(property.placeName ? { placeName: property.placeName } : {}),
       }));
       const activePropertyId = pickPropertyId(properties, action.prefer, state.activePropertyId);
       const plans = state.plans.filter((plan) => incoming.some((property) => property.id === plan.propertyId));

@@ -6,7 +6,7 @@ import { captureHubHandoff, readHubHandoff } from "../src/lib/handoff.ts";
 import { emptyState, seed } from "../src/data/seed.ts";
 import { loadOwnerProperties, publicPropertyBody, sessionCookie } from "../src/lib/propertyLoad.ts";
 import { handlePropertyPost } from "../src/lib/propertyRoute.ts";
-import { PROPERTY_HOME, readPropertyList, unmatchedHouseName } from "../src/lib/properties.ts";
+import { PROPERTY_HOME, PROPERTY_LIST_URL, readPropertyList, unmatchedHouseName } from "../src/lib/properties.ts";
 import { redactSecrets } from "../src/lib/secrets.ts";
 import { reduce } from "../src/state/reducer.ts";
 import { copy } from "../src/copy.ts";
@@ -107,6 +107,20 @@ describe("property load", () => {
     });
     assert.deepEqual(down, { ok: false, code: "unreachable" });
 
+    const denied = await loadOwnerProperties({
+      bearer: BEARER,
+      seedOrigin: "https://mcp.daup.co.za",
+      propertyUrl: PROPERTY_LIST_URL,
+      fetchImpl: async (url, init) => {
+        const headers = new Headers(init?.headers);
+        assert.equal(String(url), PROPERTY_LIST_URL);
+        assert.equal(headers.get("accept"), "application/json");
+        assert.equal(headers.get("authorization"), `Bearer ${BEARER}`);
+        return new Response("Sign in required", { status: 401 });
+      },
+    });
+    assert.deepEqual(denied, { ok: false, code: "unreachable" });
+
     let called = false;
     const unset = await loadOwnerProperties({
       houseRedeem: TOKEN,
@@ -121,6 +135,38 @@ describe("property load", () => {
     });
     assert.equal(called, false);
     assert.deepEqual(unset, { ok: false, code: "unreachable" });
+  });
+
+  it("keeps place fields and ignores unknown ones", () => {
+    const list = readPropertyList({
+      properties: [
+        {
+          id: "unit_cottage",
+          name: "Cottage",
+          suburb: "",
+          ownerId: "",
+          placeId: "place_internal",
+          externalPlaceId: PLACE,
+          placeName: "Esseboom",
+          address: "1 Long Street",
+          notes: "ignore me",
+        },
+      ],
+    });
+    assert.deepEqual(list, [
+      {
+        id: "unit_cottage",
+        name: "Cottage",
+        suburb: "",
+        ownerId: "",
+        placeId: "place_internal",
+        externalPlaceId: PLACE,
+        placeName: "Esseboom",
+      },
+    ]);
+    const packed = JSON.stringify(list);
+    assert.equal(packed.includes("Long Street"), false);
+    assert.equal(packed.includes("ignore me"), false);
   });
 
   it("does not turn a Hub place record or a dev mock into a loaded house when mock is off", async () => {
@@ -230,6 +276,53 @@ describe("preselect", () => {
     assert.equal(byName.activePropertyId, "prop_name");
   });
 
+  it("selects the Hub place by externalPlaceId, then the house by placeName", () => {
+    const cottage = {
+      id: "unit_cottage",
+      name: "Cottage",
+      suburb: "",
+      ownerId: "",
+      placeId: "place_internal",
+      externalPlaceId: PLACE,
+      placeName: "Esseboom",
+    };
+    const other = {
+      id: "unit_other",
+      name: "Other house",
+      suburb: "",
+      ownerId: "",
+      externalPlaceId: "other-place",
+      placeName: "Other",
+    };
+    const byExternal = reduce(emptyState(), {
+      type: "hydrate-properties",
+      properties: [other, cottage],
+      prefer: { houseHint: "Nope", placeIdHints: [PLACE] },
+    });
+    assert.equal(byExternal.activePropertyId, "unit_cottage");
+    assert.equal(byExternal.properties.find((item) => item.id === "unit_cottage")?.externalPlaceId, PLACE);
+    assert.notEqual(byExternal.activePropertyId, PLACE);
+
+    const byPlaceName = reduce(emptyState(), {
+      type: "hydrate-properties",
+      properties: [other, { ...cottage, externalPlaceId: "not-the-hub" }],
+      prefer: { houseHint: "esseboom", placeIdHints: ["missing-place"] },
+    });
+    assert.equal(byPlaceName.activePropertyId, "unit_cottage");
+
+    const firstOfPlace = reduce(emptyState(), {
+      type: "hydrate-properties",
+      properties: [
+        { ...cottage, id: "unit_a", name: "Cottage" },
+        { ...cottage, id: "unit_b", name: "Main house" },
+      ],
+      prefer: { houseHint: "", placeIdHints: [PLACE] },
+    });
+    assert.equal(firstOfPlace.activePropertyId, "unit_a");
+    assert.equal(firstOfPlace.properties.length, 2);
+    assert.equal(firstOfPlace.properties.some((item) => item.id === PLACE), false);
+  });
+
   it("does not invent a property, and does not keep sample drawings, when nothing matches", () => {
     const missed = reduce(seed(), {
       type: "hydrate-properties",
@@ -303,6 +396,7 @@ describe("houseRedeem stays out of logs and CallOut", () => {
 describe("property door", () => {
   it("opens DAUP Property, not the apps directory", () => {
     assert.equal(PROPERTY_HOME, "https://property.daup.co.za");
+    assert.equal(PROPERTY_LIST_URL, "https://property.daup.co.za/api/properties");
     assert.equal(copy.openProperty, "Open DAUP Property.");
     assert.match(copy.missingHouse("Esseboom"), /no record for Esseboom/);
     assert.match(copy.emptyProperties, /No properties in DAUP Property yet/);

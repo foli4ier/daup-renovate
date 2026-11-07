@@ -27,7 +27,7 @@ http://localhost:5173/?emailHint=owner@example.com&houseHint=Esseboom&placeIdHin
 
 That stand-in is not DAUP Property and it has no photos. `?propertyMock=empty` shows the empty Property screen. `?propertyMock=fail` shows the failed load. `?propertyMock=` is ignored in a production build.
 
-A real handoff redeems `houseRedeem` on this app’s Worker (`POST /api/properties`), which calls `POST https://mcp.daup.co.za/house/session/redeem`. The token is not written to the page, to logs, or to CallOut. Set `PROPERTY_URL` to the Property list (a JSON array, or `{ "properties": [...] }`, each item `id`, `name`, `suburb`, `ownerId`). The list is read with the place-session bearer. Hub place names are not treated as Property records.
+A real handoff redeems `houseRedeem` on this app’s Worker (`POST /api/properties`), which calls `POST https://mcp.daup.co.za/house/session/redeem`. The token is not written to the page, to logs, or to CallOut. The Worker then `GET`s `PROPERTY_URL` with `Authorization: Bearer` and `Accept: application/json`. That URL is `https://property.daup.co.za/api/properties` when unset. The body is `{ "properties": [...] }` with `id`, `name`, `suburb`, `ownerId`, `placeId`, `externalPlaceId`, and `placeName`. `id` is the unit, not the Hub place id. A 200 with `[]` is an empty list. 401 is a failed load. A Hub hint is not turned into a house when nothing matches.
 
 ```bash
 npm test
@@ -40,7 +40,7 @@ npm run build
 
 Set these when the apps are reachable:
 
-- `PROPERTY_URL` — list of properties, read by the Worker. Renovate never creates one. `VITE_PROPERTY_URL` is accepted by the dev server as the same list.
+- `PROPERTY_URL` — `https://property.daup.co.za/api/properties`. The Worker uses that when this is unset. Renovate never creates a property. `VITE_PROPERTY_URL` is the same list for the dev server.
 - `HOUSE_SEED_URL` — house seed that redeems `houseRedeem`. Defaults to `https://mcp.daup.co.za`.
 - `VITE_PROJECT_URL` — create the renovation project. The response must include `projectId` and `url`.
 - `VITE_CALLOUT_URL` — one request per zone. The response must include `requestId`.

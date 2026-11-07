@@ -1,6 +1,7 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Connect, type Plugin } from "vite";
 import { DEFAULT_SEED_ORIGIN } from "./src/lib/propertyLoad";
+import { PROPERTY_LIST_URL } from "./src/lib/properties";
 import { handlePropertyPost } from "./src/lib/propertyRoute";
 
 type BodyRequest = {
@@ -57,7 +58,7 @@ function attach(server: { middlewares: Connect.Server }, allowMock: boolean) {
           cookie: header(req, "cookie"),
           secure: false,
           seedOrigin: process.env.HOUSE_SEED_URL || DEFAULT_SEED_ORIGIN,
-          propertyUrl: process.env.PROPERTY_URL || process.env.VITE_PROPERTY_URL || "",
+          propertyUrl: process.env.PROPERTY_URL || process.env.VITE_PROPERTY_URL || PROPERTY_LIST_URL,
           allowMock,
           envMock: process.env.PROPERTY_MOCK === "1",
         });
