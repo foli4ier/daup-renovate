@@ -19,6 +19,7 @@
     "binding": "AI"
   },
   "vars": {
-    "HOUSE_SEED_URL": "https://mcp.daup.co.za"
+    "HOUSE_SEED_URL": "https://mcp.daup.co.za",
+    "PROPERTY_URL": "https://property.daup.co.za/api/properties"
   }
 }

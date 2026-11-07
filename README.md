@@ -40,7 +40,7 @@ npm run build
 
 Set these when the apps are reachable:
 
-- `PROPERTY_URL` — `https://property.daup.co.za/api/properties`. The Worker uses that when this is unset. Renovate never creates a property. `VITE_PROPERTY_URL` is the same list for the dev server.
+- `PROPERTY_URL` — `https://property.daup.co.za/api/properties`. Production sets this in `wrangler.json` `vars`, next to `HOUSE_SEED_URL`. The Worker uses that same URL when the var is unset. Renovate never creates a property. `VITE_PROPERTY_URL` is the same list for the dev server.
 - `HOUSE_SEED_URL` — house seed that redeems `houseRedeem`. Defaults to `https://mcp.daup.co.za`.
 - `VITE_PROJECT_URL` — create the renovation project. The response must include `projectId` and `url`.
 - `VITE_CALLOUT_URL` — one request per zone. The response must include `requestId`.
