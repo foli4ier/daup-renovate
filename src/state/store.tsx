@@ -3,9 +3,11 @@ import { calloutSource } from "../api/callout";
 import { ServiceUnreachable } from "../api/errors";
 import { generateImage } from "../api/images";
 import { projectSource } from "../api/project";
-import { propertySource } from "../api/property";
+import { loadProperties, type PropertyQuery } from "../api/property";
 import { freshPhases } from "../data/phases";
 import { emptyState, SAMPLE_SESSION_KEY, sampleRequested, seed, STORAGE_KEY } from "../data/seed";
+import { captureHubHandoff, type HubHandoff } from "../lib/handoff";
+import { unmatchedHouseName } from "../lib/properties";
 import { locateLeak, type LeakSpot } from "../lib/leak";
 import { assessTotal } from "../lib/budget";
 import { capReached, type StyleId, type Tier } from "../lib/prompt";
@@ -18,9 +20,11 @@ export type PropertyLoad = "loading" | "ready" | "error";
 type StoreValue = {
   state: State;
   propertyLoad: PropertyLoad;
+  unmatchedHouse: string;
   busyZoneId: string | null;
   dispatch: (action: Action) => void;
   reloadProperties: () => void;
+  chooseProperty: (propertyId: string) => void;
   startPlan: (name: string) => void;
   addPhoto: (photo: Photo) => void;
   saveGuides: (zoneId: string, guides: { style?: StyleId; styleNote?: string; budget?: Tier; keep: string[]; replace: string[] }) => void;
@@ -30,6 +34,24 @@ type StoreValue = {
 };
 
 const StoreContext = createContext<StoreValue | null>(null);
+
+let cachedHandoff: HubHandoff | null = null;
+
+function browserHandoff(): HubHandoff {
+  if (cachedHandoff) return cachedHandoff;
+  cachedHandoff = captureHubHandoff(
+    { search: window.location.search, pathname: window.location.pathname, hash: window.location.hash },
+    (url) => window.history.replaceState(null, "", url),
+  );
+  return cachedHandoff;
+}
+
+function devMock(): PropertyQuery["mock"] {
+  if (!import.meta.env.DEV) return "";
+  const value = new URLSearchParams(window.location.search).get("propertyMock");
+  if (value === "house" || value === "empty" || value === "fail") return value;
+  return "";
+}
 
 function load(): State {
   if (typeof window !== "undefined" && sampleRequested()) {
@@ -62,10 +84,11 @@ function load(): State {
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, rawDispatch] = useReducer(reduce, undefined, load);
   const [busyZoneId, setBusyZoneId] = useState<string | null>(null);
-  const [propertyLoad, setPropertyLoad] = useState<PropertyLoad>(
-    sampleRequested() || !import.meta.env.VITE_PROPERTY_URL ? "ready" : "loading",
-  );
+  const [propertyLoad, setPropertyLoad] = useState<PropertyLoad>(sampleRequested() ? "ready" : "loading");
+  const [unmatchedHouse, setUnmatchedHouse] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const preferApplied = useRef(false);
+  const redeemSettled = useRef(false);
   const ref = useRef(state);
   ref.current = state;
   const dispatch = (action: Action) => {
@@ -84,17 +107,43 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (state.sample) return;
-    if (!import.meta.env.VITE_PROPERTY_URL) {
-      setPropertyLoad("ready");
-      return;
-    }
+    const handoff = browserHandoff();
+    const mock = devMock();
+    const sendRedeem = redeemSettled.current ? "" : handoff.houseRedeem;
+    const key = `${reloadKey}:${sendRedeem ? "r" : "l"}:${mock || ""}`;
     let cancel = false;
     setPropertyLoad("loading");
-    propertySource
-      .listProperties()
-      .then((properties) => {
+    loadProperties(
+      {
+        houseRedeem: sendRedeem,
+        emailHint: handoff.emailHint,
+        houseHint: handoff.houseHint,
+        placeIdHints: handoff.placeIdHints,
+        mock,
+      },
+      key,
+    )
+      .then((result) => {
         if (cancel) return;
-        dispatch({ type: "hydrate-properties", properties });
+        const spent = !result.ok && (result.code === "redeem" || result.spent === true);
+        if (sendRedeem && (result.ok || spent)) redeemSettled.current = true;
+        if (!result.ok) {
+          setPropertyLoad("error");
+          return;
+        }
+        const first = !preferApplied.current;
+        preferApplied.current = true;
+        dispatch({
+          type: "hydrate-properties",
+          properties: result.properties,
+          prefer: first
+            ? { houseHint: handoff.houseHint, placeIdHints: handoff.placeIdHints }
+            : undefined,
+        });
+        if (first) setUnmatchedHouse(unmatchedHouseName(result.properties, {
+          houseHint: handoff.houseHint,
+          placeIdHints: handoff.placeIdHints,
+        }));
         setPropertyLoad("ready");
       })
       .catch(() => {
@@ -108,10 +157,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const api: StoreValue = {
       state,
       propertyLoad,
+      unmatchedHouse,
       busyZoneId,
       dispatch,
       reloadProperties() {
         setReloadKey((value) => value + 1);
+      },
+      chooseProperty(propertyId: string) {
+        setUnmatchedHouse("");
+        dispatch({ type: "select-property", propertyId });
       },
       startPlan(name: string) {
         const property = activeProperty(ref.current);

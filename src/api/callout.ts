@@ -1,4 +1,5 @@
 import { assertClean } from "../lib/leak";
+import { carriesHouseRedeem } from "../lib/secrets";
 import { ServiceUnreachable } from "./errors";
 
 export type CalloutDraft = {
@@ -14,9 +15,23 @@ export interface CalloutSource {
   sendRequest(input: CalloutDraft): Promise<{ requestId: string }>;
 }
 
+/** Body that may be posted to CallOut. Amounts and houseRedeem never leave this function. */
+export function calloutJson(input: CalloutDraft): string {
+  assertClean(input.scope);
+  if (carriesHouseRedeem(input)) throw new ServiceUnreachable();
+  return JSON.stringify({
+    planId: input.planId,
+    zoneId: input.zoneId,
+    zoneName: input.zoneName,
+    scope: input.scope,
+    beforeUrl: input.beforeUrl,
+    afterUrl: input.afterUrl,
+  });
+}
+
 export const calloutSource: CalloutSource = {
   async sendRequest(input) {
-    assertClean(input.scope);
+    const body = calloutJson(input);
     if (!input.beforeUrl || !input.afterUrl) throw new ServiceUnreachable();
     const url = import.meta.env.VITE_CALLOUT_URL;
     if (!url) throw new ServiceUnreachable();
@@ -25,7 +40,7 @@ export const calloutSource: CalloutSource = {
       response = await fetch(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(input),
+        body,
       });
     } catch {
       throw new ServiceUnreachable();

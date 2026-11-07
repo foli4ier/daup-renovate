@@ -17,5 +17,8 @@
   },
   "ai": {
     "binding": "AI"
+  },
+  "vars": {
+    "HOUSE_SEED_URL": "https://mcp.daup.co.za"
   }
 }

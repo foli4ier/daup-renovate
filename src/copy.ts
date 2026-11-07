@@ -48,6 +48,7 @@ export const copy = {
   continuePlan: "Continue a plan.",
   yourProperties: "Your properties",
   emptyProperties: "No properties in DAUP Property yet. Add one there first, then come back.",
+  missingHouse: (name: string) => `DAUP Property has no record for ${name}. Add it there first, then come back.`,
   inProject: "It's in Project.",
   projectNote: "This creates a renovation project in DAUP Project, with the work phases and the estimated budget. You can still edit it there.",
   projectOpen: "You can still edit it there.",

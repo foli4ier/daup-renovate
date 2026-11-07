@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { copy } from "../copy";
+import { OpenProperty, PropertyCards } from "../components/PropertyStatus";
 import { PushSheet } from "../components/ProjectSheets";
 import { Wordmark } from "../components/Chrome";
 import { Sheet } from "../components/Chrome";
@@ -12,8 +13,9 @@ import type { NextStep } from "../lib/status";
 
 export default function Home() {
   const navigate = useNavigate();
-  const { state, propertyLoad, reloadProperties, startPlan, dispatch } = useRenovate();
-  const property = activeProperty(state);
+  const { state, propertyLoad, unmatchedHouse, reloadProperties, chooseProperty, startPlan, dispatch } = useRenovate();
+  const selected = state.properties.find((item) => item.id === state.activePropertyId);
+  const property = state.sample || !unmatchedHouse ? activeProperty(state) : selected;
   const plan = activePlan(state);
   const next = planNext(state);
   const [naming, setNaming] = useState(false);
@@ -67,11 +69,10 @@ export default function Home() {
       <div className="page has-action">
         <Wordmark />
         <h1>Your properties</h1>
-        <p>{copy.emptyProperties}</p>
+        <p>{unmatchedHouse ? copy.missingHouse(unmatchedHouse) : copy.emptyProperties}</p>
+        <PropertyCards properties={state.properties} onChoose={chooseProperty} />
         <div className="action-bar">
-          <a className="btn btn-primary btn-wide" href="https://apps.daup.co.za">
-            {copy.openProperty}
-          </a>
+          <OpenProperty />
         </div>
       </div>
     );
