@@ -1,3 +1,6 @@
+import { DEFAULT_SEED_ORIGIN } from "../src/lib/propertyLoad";
+import { PROPERTY_LIST_URL } from "../src/lib/properties";
+import { handlePropertyPost } from "../src/lib/propertyRoute";
 import { buildEditPrompt, capReached, MODEL_KLEIN, type PromptInput } from "../src/lib/prompt";
 
 type AiBinding = {
@@ -12,6 +15,8 @@ interface Env {
   AI?: AiBinding;
   KONTEXT_API_URL?: string;
   KONTEXT_API_TOKEN?: string;
+  HOUSE_SEED_URL?: string;
+  PROPERTY_URL?: string;
 }
 
 type GenerateBody = Partial<PromptInput> & {
@@ -141,10 +146,32 @@ async function generate(request: Request, env: Env): Promise<Response> {
   return json({ ok: true, imageBase64: image, mime: mimeFor(image) });
 }
 
+async function properties(request: Request, env: Env): Promise<Response> {
+  let body: unknown = {};
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+  const result = await handlePropertyPost({
+    body,
+    cookie: request.headers.get("cookie"),
+    secure: new URL(request.url).protocol === "https:",
+    seedOrigin: env.HOUSE_SEED_URL || DEFAULT_SEED_ORIGIN,
+    propertyUrl: env.PROPERTY_URL || PROPERTY_LIST_URL,
+    allowMock: false,
+    envMock: false,
+  });
+  const headers: Record<string, string> = { "content-type": "application/json; charset=utf-8" };
+  if (result.setCookie) headers["set-cookie"] = result.setCookie;
+  return new Response(JSON.stringify(result.body), { status: result.status, headers });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/api/health") return json({ ok: true });
+    if (url.pathname === "/api/properties" && request.method === "POST") return properties(request, env);
     if (url.pathname === "/api/generate" && request.method === "POST") return generate(request, env);
     return env.ASSETS.fetch(request);
   },

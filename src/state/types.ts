@@ -10,6 +10,9 @@ export type Property = {
   suburb: string;
   ownerId: string;
   coverPhotoId: string;
+  placeId?: string;
+  externalPlaceId?: string;
+  placeName?: string;
 };
 
 export type ZoneAnswer = {

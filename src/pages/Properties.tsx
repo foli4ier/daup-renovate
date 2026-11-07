@@ -2,60 +2,67 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { copy } from "../copy";
 import { TopBar } from "../components/Chrome";
+import { OpenProperty } from "../components/PropertyStatus";
 import { statusLabel } from "../lib/status";
 import { useRenovate } from "../state/store";
 
 export default function Properties() {
   const navigate = useNavigate();
-  const { state, propertyLoad, reloadProperties, dispatch } = useRenovate();
+  const { state, propertyLoad, unmatchedHouse, reloadProperties, chooseProperty } = useRenovate();
   const [query, setQuery] = useState("");
   const properties = state.properties;
-  const showSearch = properties.length > 5;
+  const showSearch = propertyLoad === "ready" && properties.length > 5;
   const visible = properties.filter((property) => {
     const hay = `${property.name} ${property.suburb}`.toLowerCase();
     return hay.includes(query.trim().toLowerCase());
   });
 
+  const searching = showSearch && query.trim().length > 0;
+  const showOpen = propertyLoad === "ready" && (properties.length === 0 || Boolean(unmatchedHouse)) && !(searching && visible.length === 0);
+
   return (
-    <div className={`page ${properties.length === 0 && propertyLoad === "ready" ? "has-action" : ""}`}>
+    <div className={`page ${propertyLoad === "error" || showOpen ? "has-action" : ""}`}>
       <TopBar title={copy.yourProperties} />
       {propertyLoad === "loading" ? <p>{copy.propertiesLoading}</p> : null}
       {propertyLoad === "error" ? (
         <>
           <p className="warn">{copy.propertiesFailed}</p>
-          <button className="btn btn-primary" type="button" onClick={reloadProperties}>
-            {copy.tryLoad}
-          </button>
-        </>
-      ) : null}
-      {propertyLoad === "ready" && properties.length === 0 ? (
-        <>
-          <p>{copy.emptyProperties}</p>
           <div className="action-bar">
-            <a className="btn btn-primary btn-wide" href="https://apps.daup.co.za">
-              {copy.openProperty}
-            </a>
+            <button className="btn btn-primary btn-wide" type="button" onClick={reloadProperties}>
+              {copy.tryLoad}
+            </button>
           </div>
         </>
       ) : null}
-      {showSearch ? (
-        <input
-          className="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          aria-label="Search properties"
-          placeholder="Search"
-        />
+      {propertyLoad === "ready" && properties.length === 0 ? (
+        <p>{unmatchedHouse ? copy.missingHouse(unmatchedHouse) : copy.emptyProperties}</p>
       ) : null}
-      {showSearch && query.trim() && visible.length === 0 ? (
+      {propertyLoad === "ready" && unmatchedHouse && properties.length > 0 ? <p>{copy.missingHouse(unmatchedHouse)}</p> : null}
+      {showOpen ? (
+        <div className="action-bar">
+          <OpenProperty />
+        </div>
+      ) : null}
+      {propertyLoad === "ready" ? (
         <>
-          <p>{copy.noMatch}</p>
-          <button className="btn btn-primary" type="button" onClick={() => setQuery("")}>
-            {copy.clearSearch}
-          </button>
-        </>
-      ) : null}
-      <div className="stack" style={{ marginTop: 12 }}>
+          {showSearch ? (
+            <input
+              className="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              aria-label="Search properties"
+              placeholder="Search"
+            />
+          ) : null}
+          {showSearch && query.trim() && visible.length === 0 ? (
+            <>
+              <p>{copy.noMatch}</p>
+              <button className="btn btn-primary" type="button" onClick={() => setQuery("")}>
+                {copy.clearSearch}
+              </button>
+            </>
+          ) : null}
+          <div className="stack" style={{ marginTop: 12 }}>
         {visible.map((property) => {
           const plans = state.plans.filter((plan) => plan.propertyId === property.id);
           const open = plans.find((plan) => plan.id === state.activePlanId) ?? plans[0];
@@ -67,7 +74,7 @@ export default function Properties() {
               className="property-card"
               type="button"
               onClick={() => {
-                dispatch({ type: "select-property", propertyId: property.id });
+                chooseProperty(property.id);
                 navigate(open ? "/plan" : "/");
               }}
             >
@@ -79,8 +86,10 @@ export default function Properties() {
               </span>
             </button>
           );
-        })}
-      </div>
+          })}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }

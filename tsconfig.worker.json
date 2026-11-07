@@ -11,5 +11,5 @@
     "noUnusedParameters": true,
     "types": ["@cloudflare/workers-types"]
   },
-  "include": ["worker", "src/lib/prompt.ts"]
+  "include": ["worker", "src/lib/prompt.ts", "src/lib/secrets.ts", "src/lib/properties.ts", "src/lib/propertyLoad.ts", "src/lib/propertyRoute.ts"]
 }

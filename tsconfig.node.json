@@ -12,8 +12,13 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "composite": true
+    "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts"]
+  "include": [
+    "vite.config.ts",
+    "src/lib/propertyLoad.ts",
+    "src/lib/propertyRoute.ts",
+    "src/lib/secrets.ts",
+    "src/lib/properties.ts"
+  ]
 }

@@ -1,5 +1,8 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Connect, type Plugin } from "vite";
+import { DEFAULT_SEED_ORIGIN } from "./src/lib/propertyLoad";
+import { PROPERTY_LIST_URL } from "./src/lib/properties";
+import { handlePropertyPost } from "./src/lib/propertyRoute";
 
 type BodyRequest = {
   url?: string;
@@ -33,11 +36,37 @@ function send(res: { statusCode: number; setHeader(name: string, value: string):
   res.end(JSON.stringify(body));
 }
 
-function attach(server: { middlewares: Connect.Server }) {
+function header(req: { headers: Record<string, string | string[] | undefined> }, name: string): string | null {
+  const value = req.headers[name];
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function attach(server: { middlewares: Connect.Server }, allowMock: boolean) {
   server.middlewares.use(async (req, res, next) => {
     const url = req.url ?? "";
     if (!url.startsWith("/api/")) {
       next();
+      return;
+    }
+    if (url.startsWith("/api/properties") && req.method === "POST") {
+      try {
+        const raw = await readBody(req);
+        const body = raw ? (JSON.parse(raw) as unknown) : {};
+        const result = await handlePropertyPost({
+          body,
+          cookie: header(req, "cookie"),
+          secure: false,
+          seedOrigin: process.env.HOUSE_SEED_URL || DEFAULT_SEED_ORIGIN,
+          propertyUrl: process.env.PROPERTY_URL || process.env.VITE_PROPERTY_URL || PROPERTY_LIST_URL,
+          allowMock,
+          envMock: process.env.PROPERTY_MOCK === "1",
+        });
+        if (result.setCookie) res.setHeader("set-cookie", result.setCookie);
+        send(res, result.status, result.body);
+      } catch {
+        send(res, 200, { ok: false, code: "unreachable" });
+      }
       return;
     }
     if (url.startsWith("/api/health")) {
@@ -65,8 +94,12 @@ function attach(server: { middlewares: Connect.Server }) {
 
 const apiPlugin: Plugin = {
   name: "renovate-api",
-  configureServer: attach,
-  configurePreviewServer: attach,
+  configureServer(server) {
+    attach(server, true);
+  },
+  configurePreviewServer(server) {
+    attach(server, process.env.PROPERTY_MOCK === "1");
+  },
 };
 
 export default defineConfig({

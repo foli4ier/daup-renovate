@@ -1,4 +1,5 @@
 import type { DaupProperty } from "../api/property";
+import { pickPropertyId, type PropertyPrefer } from "../lib/properties";
 import { freshPhases } from "../data/phases";
 import { emptyState } from "../data/seed";
 import { defaultZones } from "../data/zones";
@@ -9,7 +10,7 @@ const PHOTO_CAP = 6;
 
 export type Action =
   | { type: "replace"; state: State }
-  | { type: "hydrate-properties"; properties: DaupProperty[] }
+  | { type: "hydrate-properties"; properties: DaupProperty[]; prefer?: PropertyPrefer }
   | { type: "select-property"; propertyId: string }
   | { type: "select-plan"; planId: string }
   | { type: "start-plan"; plan: Plan }
@@ -61,15 +62,31 @@ export function reduce(state: State, action: Action): State {
         suburb: property.suburb,
         ownerId: property.ownerId,
         coverPhotoId: state.properties.find((item) => item.id === property.id)?.coverPhotoId ?? "",
+        ...(property.placeId ? { placeId: property.placeId } : {}),
+        ...(property.externalPlaceId ? { externalPlaceId: property.externalPlaceId } : {}),
+        ...(property.placeName ? { placeName: property.placeName } : {}),
       }));
-      const activePropertyId = properties.some((property) => property.id === state.activePropertyId)
-        ? state.activePropertyId
-        : (properties[0]?.id ?? "");
+      const activePropertyId = pickPropertyId(properties, action.prefer, state.activePropertyId);
+      const plans = state.plans.filter((plan) => incoming.some((property) => property.id === plan.propertyId));
+      const planIds = new Set(plans.map((plan) => plan.id));
+      const zoneIds = new Set(zones.map((zone) => zone.id));
       const activePlanId =
-        state.plans.find((plan) => plan.id === state.activePlanId && plan.propertyId === activePropertyId)?.id ??
-        state.plans.find((plan) => plan.propertyId === activePropertyId)?.id ??
+        plans.find((plan) => plan.id === state.activePlanId && plan.propertyId === activePropertyId)?.id ??
+        plans.find((plan) => plan.propertyId === activePropertyId)?.id ??
         null;
-      return { ...state, properties, zones, activePropertyId, activePlanId, sample: false };
+      return {
+        ...state,
+        properties,
+        zones,
+        photos: state.photos.filter((photo) => zoneIds.has(photo.zoneId)),
+        plans,
+        links: state.links.filter((link) => planIds.has(link.planId) && zoneIds.has(link.zoneId)),
+        proposals: state.proposals.filter((proposal) => planIds.has(proposal.planId) && zoneIds.has(proposal.zoneId)),
+        requests: state.requests.filter((request) => planIds.has(request.planId)),
+        activePropertyId,
+        activePlanId,
+        sample: false,
+      };
     }
     case "select-property": {
       const plans = state.plans.filter((plan) => plan.propertyId === action.propertyId);

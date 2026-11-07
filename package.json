@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && tsc -p tsconfig.worker.json && vite build",
+    "build": "tsc -b && tsc -p tsconfig.node.json && tsc -p tsconfig.worker.json && vite build",
     "preview": "vite preview",
     "test": "tsx --test test/*.test.ts",
-    "typecheck": "tsc -b && tsc -p tsconfig.worker.json"
+    "typecheck": "tsc -b && tsc -p tsconfig.node.json && tsc -p tsconfig.worker.json"
   },
   "dependencies": {
     "daup-theme": "github:foli4ier/daup-theme#main",
