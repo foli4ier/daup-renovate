@@ -55,7 +55,9 @@ Plans and photos stay in this browser.
 
 ## Pictures
 
-Generate calls the Worker, which runs FLUX.2 [klein] 9B. Cap is 3 successful pictures per zone per plan. A failed try does not count. Photos under about 1 megapixel get a warning and can still be used. If the view drifts, the next try can use FLUX.1 Kontext [pro] when `KONTEXT_API_URL` and `KONTEXT_API_TOKEN` are set. That switch is not shown in the app.
+Generate calls the Worker, which runs FLUX.2 [klein] 9B. Cap is 3 successful generated pictures per zone per plan. A failed try does not count. An uploaded after is a proposal too, and it does not use that cap. Photos under about 1 megapixel get a warning and can still be used. A small uploaded after is warned and not blocked. If the view drifts, the next try can use FLUX.1 Kontext [pro] when `KONTEXT_API_URL` and `KONTEXT_API_TOKEN` are set. That switch is not shown in the app.
+
+An uploaded after is read with Workers AI (`@cf/meta/llama-3.2-11b-vision-instruct`) into one editable line. If that call fails, the picture stays and the owner types the line. Later zones that follow the look keep their own before as the camera view. The uploaded picture is sent as a style reference (`input_image_1`) when the generate call can take one.
 
 ## CallOut
 

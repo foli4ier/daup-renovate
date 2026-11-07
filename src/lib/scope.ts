@@ -1,5 +1,6 @@
 import { findLeak } from "./leak";
 import type { StyleId } from "./prompt";
+import { usableRead } from "./reading";
 
 export type ScopeInput = {
   zoneName: string;
@@ -20,6 +21,7 @@ export function styleSentence(style: StyleId, note?: string): string {
   if (style === "budget-refresh") return "Paint and small fixes.";
   if (style === "modern") return "A modern finish.";
   if (style === "keep-character") return "Keep the character of the place.";
+  if (style === "from-after") return sentence(usableRead(note));
   return sentence(note ?? "");
 }
 

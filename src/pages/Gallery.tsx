@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { copy } from "../copy";
+import { copy, galleryRetryLabel } from "../copy";
 import { styleLabel, tierLabel } from "../data/guides";
 import { ActionBar, BeforeAfter, Sheet, TopBar } from "../components/Chrome";
 import { PushSheet } from "../components/ProjectSheets";
 import { whatChanges } from "../lib/changes";
-import { triesLeft } from "../lib/prompt";
+import { ABOUT_ONE_MEGAPIXEL, triesLeft } from "../lib/prompt";
 import { activePlan, linkFor, photosFor, planNext, proposalsFor, stepHref, visibleZones, zonePill } from "../state/select";
 import { useRenovate } from "../state/store";
 
@@ -45,6 +45,15 @@ export default function Gallery() {
   const current = pictures.find((item) => item.id === selected) ?? pictures[pictures.length - 1];
   const before = current ? state.photos.find((photo) => photo.id === current.beforePhotoId) : photosFor(state, zone?.id ?? "")[0];
   const left = triesLeft(link?.attempts ?? 0);
+  const hasUpload = pictures.some((item) => item.source === "uploaded");
+  const showingUploaded = current?.source === "uploaded";
+  const retryLabel = galleryRetryLabel(link?.attempts ?? 0, hasUpload);
+  const fromZone = link?.styleFromZoneId ? state.zones.find((item) => item.id === link.styleFromZoneId) : undefined;
+  const changes = link ? whatChanges({ read: link.readLine, keep: link.keep, replace: link.replace }) : [];
+  const smallAfter =
+    showingUploaded && current?.width && current?.height && current.width * current.height < ABOUT_ONE_MEGAPIXEL
+      ? copy.smallAfter(current.width, current.height)
+      : "";
   const next = planNext(state);
 
   function onScroll() {
@@ -114,24 +123,58 @@ export default function Gallery() {
           );
         })}
       </div>
+      {smallAfter ? (
+        <p className="photo-warn" style={{ marginTop: 10 }}>
+          {smallAfter}
+        </p>
+      ) : null}
+      {hasUpload && zone && link ? (
+        <>
+          <label className="field" htmlFor="what-we-read">
+            {copy.whatWeRead}
+            <textarea
+              id="what-we-read"
+              className="read-line"
+              rows={3}
+              value={link.readLine ?? ""}
+              onChange={(event) =>
+                dispatch({ type: "set-read-line", planId: currentPlan.id, zoneId: zone.id, text: event.target.value })
+              }
+            />
+          </label>
+          <button
+            id="share-look"
+            className="choice"
+            type="button"
+            style={{ width: "100%" }}
+            aria-pressed={Boolean(link.shareLook)}
+            onClick={() => dispatch({ type: "share-look", planId: currentPlan.id, zoneId: zone.id, on: !link.shareLook })}
+          >
+            {copy.useLook}
+          </button>
+          <p className="meta">{copy.useLookHelp}</p>
+        </>
+      ) : null}
       {link?.style && link.budget ? (
         <div className="chips" style={{ marginTop: 12 }}>
-          <span className="choice" aria-pressed="true">{styleLabel(link.style, link.styleNote)}</span>
+          <span className="choice" aria-pressed="true">
+            {styleLabel(link.style, link.styleNote, link.style === "from-after" ? fromZone?.name : undefined)}
+          </span>
           <span className="choice" aria-pressed="true">{tierLabel(link.budget)}</span>
         </div>
       ) : null}
-      {link && link.replace.length ? (
+      {changes.length ? (
         <>
-          <h2 style={{ marginTop: 16 }}>{copy.whatChanges}</h2>
+          <h2 id="what-changes" style={{ marginTop: 16 }}>{copy.whatChanges}</h2>
           <ul className="changes">
-            {whatChanges(link.replace).map((item) => (
-              <li key={item}>{item}</li>
+            {changes.map((item, index) => (
+              <li key={`${index}-${item}`}>{item}</li>
             ))}
           </ul>
         </>
       ) : null}
       {pictures.length > 1 ? (
-        <div className="photo-row" style={{ marginTop: 12 }}>
+        <div className="photo-row" id="proposal-thumbs" style={{ marginTop: 12 }}>
           {pictures.map((picture) => (
             <button
               key={picture.id}
@@ -140,39 +183,41 @@ export default function Gallery() {
               aria-pressed={picture.id === current?.id}
               onClick={() => setSelected(picture.id)}
             >
-              <img src={picture.imageUrl} alt="" />
+              <img src={picture.imageUrl} alt={picture.source === "uploaded" ? "Uploaded after" : "Generated after"} />
             </button>
           ))}
         </div>
       ) : null}
-      <p className="meta impression">{copy.impression}</p>
+      {showingUploaded ? <p className="meta impression">{copy.uploadedAfter}</p> : <p className="meta impression">{copy.impression}</p>}
       {link?.lastFailed ? <p className="warn" style={{ marginTop: 10 }}>{copy.failure}</p> : null}
       {busyZoneId === zone?.id ? <p className="meta">{copy.making}</p> : null}
       {zone && link ? (
-        <>
-          <button
-            className="text-btn drift-link"
-            type="button"
-            disabled={left === 0}
-            onClick={() => {
-              setKeepDraft(link.keep.join("\n"));
-              setDriftOpen(true);
-            }}
-          >
-            {copy.drift}
+        <button
+          id="drift-link"
+          className="text-btn drift-link"
+          type="button"
+          disabled={left === 0}
+          onClick={() => {
+            setKeepDraft(link.keep.join("\n"));
+            setDriftOpen(true);
+          }}
+        >
+          {copy.drift}
+        </button>
+      ) : null}
+      {zone && link && !driftOpen && !pushOpen ? (
+        <div className="try-row" id="try-row" style={{ marginTop: 8 }}>
+          <button id="try-again" className="btn btn-outline" type="button" disabled={left === 0 || busyZoneId === zone.id} onClick={() => void retry(false)}>
+            {retryLabel}
           </button>
-        </>
+          <span className="meta">{copy.triesLeft(left)}</span>
+        </div>
       ) : null}
 
       {driftOpen || pushOpen || !zone || !link ? null : (
         <ActionBar>
-          <div className="try-row">
-            <button className="btn btn-outline" type="button" disabled={left === 0 || busyZoneId === zone.id} onClick={() => void retry(false)}>
-              {copy.tryAgain}
-            </button>
-            <span className="meta">{copy.triesLeft(left)}</span>
-          </div>
           <button
+            id="approve"
             className="btn btn-primary btn-wide"
             type="button"
             disabled={!current && zonePill(state, plan.id, zone) !== "approved"}
@@ -207,7 +252,7 @@ export default function Gallery() {
           footer={
             <div className="try-row">
               <button className="btn btn-primary" type="button" disabled={left === 0} onClick={() => void retry(true)}>
-                {copy.tryAgain}
+                {retryLabel}
               </button>
               <span className="meta">{copy.triesLeft(left)}</span>
             </div>

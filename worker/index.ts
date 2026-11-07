@@ -1,13 +1,11 @@
 import { DEFAULT_SEED_ORIGIN } from "../src/lib/propertyLoad";
 import { PROPERTY_LIST_URL } from "../src/lib/properties";
 import { handlePropertyPost } from "../src/lib/propertyRoute";
-import { buildEditPrompt, capReached, MODEL_KLEIN, type PromptInput } from "../src/lib/prompt";
+import { describePrompt, parseReading } from "../src/lib/reading";
+import { buildEditPrompt, capReached, MODEL_KLEIN, MODEL_VISION, withStyleReference, type PromptInput } from "../src/lib/prompt";
 
 type AiBinding = {
-  run(
-    model: string,
-    input: { multipart: { body: ReadableStream<Uint8Array> | null; contentType: string } },
-  ): Promise<unknown>;
+  run(model: string, input: unknown): Promise<unknown>;
 };
 
 interface Env {
@@ -25,6 +23,14 @@ type GenerateBody = Partial<PromptInput> & {
   mime?: string;
   width?: number;
   height?: number;
+  prompt?: string;
+  styleImageBase64?: string;
+  styleMime?: string;
+};
+
+type DescribeBody = {
+  imageBase64?: string;
+  zoneName?: string;
   prompt?: string;
 };
 
@@ -73,13 +79,24 @@ function extractImage(payload: unknown): string | null {
   return null;
 }
 
-async function runKlein(env: Env, prompt: string, bytes: Uint8Array, mime: string, width: number, height: number): Promise<string | null> {
+async function runKlein(
+  env: Env,
+  prompt: string,
+  bytes: Uint8Array,
+  mime: string,
+  width: number,
+  height: number,
+  style?: { bytes: Uint8Array; mime: string },
+): Promise<string | null> {
   if (!env.AI) return null;
   const form = new FormData();
-  form.set("prompt", prompt);
+  form.set("prompt", withStyleReference(prompt, Boolean(style)));
   form.set("width", String(width));
   form.set("height", String(height));
   form.set("input_image_0", new Blob([bytes]), mime === "image/png" ? "before.png" : "before.jpg");
+  if (style) {
+    form.set("input_image_1", new Blob([style.bytes]), style.mime === "image/png" ? "style.png" : "style.jpg");
+  }
   const encoded = new Response(form);
   const contentType = encoded.headers.get("content-type");
   if (!encoded.body || !contentType) return null;
@@ -138,12 +155,51 @@ async function generate(request: Request, env: Env): Promise<Response> {
   const width = body.width && body.width > 0 ? body.width : 1024;
   const height = body.height && body.height > 0 ? body.height : 768;
   const prompt = promptFrom(body);
+  const style =
+    body.styleImageBase64 && body.styleImageBase64.length > 0
+      ? { bytes: base64ToBytes(body.styleImageBase64), mime: body.styleMime || "image/jpeg" }
+      : undefined;
   let image: string | null = null;
   if (body.drift) image = await runKontext(env, prompt, bytes);
-  if (!image) image = await runKlein(env, prompt, bytes, mime, width, height);
+  if (!image) image = await runKlein(env, prompt, bytes, mime, width, height, style);
   if (!image) image = await runKontext(env, prompt, bytes);
   if (!image) return json({ ok: false, code: env.AI ? "failed" : "unavailable" });
   return json({ ok: true, imageBase64: image, mime: mimeFor(image) });
+}
+
+function visionText(payload: unknown): string | null {
+  if (!payload) return null;
+  if (typeof payload === "string") return payload;
+  if (typeof payload !== "object") return null;
+  const record = payload as Record<string, unknown>;
+  if (typeof record.response === "string") return record.response;
+  if (typeof record.description === "string") return record.description;
+  if (typeof record.result === "string") return record.result;
+  return null;
+}
+
+async function describe(request: Request, env: Env): Promise<Response> {
+  let body: DescribeBody;
+  try {
+    body = (await request.json()) as DescribeBody;
+  } catch {
+    return json({ ok: false });
+  }
+  if (!env.AI || !body.imageBase64) return json({ ok: false });
+  const zoneName = body.zoneName?.trim() || "this zone";
+  try {
+    const result = await env.AI.run(MODEL_VISION, {
+      prompt: body.prompt?.trim() || describePrompt(zoneName),
+      image: `data:image/jpeg;base64,${body.imageBase64}`,
+      max_tokens: 400,
+      temperature: 0.2,
+    });
+    const reading = parseReading(visionText(result) ?? "");
+    if (!reading) return json({ ok: false });
+    return json({ ok: true, description: reading.description, keep: reading.keep, replace: reading.replace });
+  } catch {
+    return json({ ok: false });
+  }
 }
 
 async function properties(request: Request, env: Env): Promise<Response> {
@@ -173,6 +229,7 @@ export default {
     if (url.pathname === "/api/health") return json({ ok: true });
     if (url.pathname === "/api/properties" && request.method === "POST") return properties(request, env);
     if (url.pathname === "/api/generate" && request.method === "POST") return generate(request, env);
+    if (url.pathname === "/api/describe" && request.method === "POST") return describe(request, env);
     return env.ASSETS.fetch(request);
   },
 };

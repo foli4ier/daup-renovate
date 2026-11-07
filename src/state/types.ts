@@ -49,6 +49,10 @@ export type Proposal = {
   beforePhotoId: string;
   imageUrl: string;
   createdAt: string;
+  /** Missing means a generated picture, so older plans keep their cap. */
+  source?: "generated" | "uploaded";
+  width?: number;
+  height?: number;
 };
 
 export type PlanLink = {
@@ -56,6 +60,14 @@ export type PlanLink = {
   zoneId: string;
   style?: StyleId;
   styleNote?: string;
+  /** Short reading of an uploaded after. Stays when this zone picks another chip. */
+  readLine?: string;
+  /** Set on zones that follow another zone's uploaded look. */
+  styleFromZoneId?: string;
+  /** Uploaded picture used as the style reference. */
+  styleReferenceProposalId?: string;
+  /** Use this style on the other zones. Starts on after an upload. */
+  shareLook?: boolean;
   budget?: Tier;
   keep: string[];
   replace: string[];

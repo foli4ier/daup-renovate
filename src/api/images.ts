@@ -5,6 +5,7 @@ export type GenerateRequest = PromptInput & {
   attemptsUsed: number;
   beforePhotoId: string;
   imageUrl: string;
+  styleImageUrl?: string;
 };
 
 export type GenerateResponse =
@@ -53,6 +54,7 @@ export async function generateImage(input: GenerateRequest): Promise<GenerateRes
   if (capReached(input.attemptsUsed)) return { ok: false, code: "cap" };
   try {
     const fitted = await resizeForModel(input.imageUrl);
+    const style = input.styleImageUrl ? await resizeForModel(input.styleImageUrl) : null;
     const response = await fetch("/api/generate", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -64,6 +66,7 @@ export async function generateImage(input: GenerateRequest): Promise<GenerateRes
         mime: fitted?.mime ?? "image/jpeg",
         width: fitted?.outWidth ?? 1024,
         height: fitted?.outHeight ?? 768,
+        ...(style?.base64 ? { styleImageBase64: style.base64, styleMime: style.mime } : {}),
       }),
     });
     if (response.ok) {
