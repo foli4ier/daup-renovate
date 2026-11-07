@@ -32,8 +32,11 @@ type StoreValue = {
   startPlan: (name: string) => void;
   addPhoto: (photo: Photo) => void;
   saveGuides: (zoneId: string, guides: { style?: StyleId; styleNote?: string; budget?: Tier; keep: string[]; replace: string[] }) => void;
-  uploadAfter: (zoneId: string, photo: { url: string; width: number; height: number }) => Promise<{ ok: boolean }>;
-  generate: (zoneId: string, options?: { drift?: boolean }) => Promise<{ ok: boolean }>;
+  uploadAfter: (
+    zoneId: string,
+    photo: { url: string; width: number; height: number },
+  ) => Promise<{ ok: true; proposalId: string } | { ok: false }>;
+  generate: (zoneId: string, options?: { drift?: boolean }) => Promise<{ ok: true; proposalId: string } | { ok: false }>;
   pushProject: () => Promise<{ ok: true; url: string } | { ok: false }>;
   sendCallouts: (zoneIds: string[]) => Promise<{ ok: boolean; blocked: boolean; spots: (LeakSpot & { zoneId: string; zoneName: string })[] }>;
 };
@@ -207,6 +210,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (!plan || !zone || !canOfferAfterUpload(photos.length)) return { ok: false };
         const before = starredPhoto(photos);
         if (!before) return { ok: false };
+        const proposalId = `proposal_${crypto.randomUUID()}`;
         setBusyZoneId(zoneId);
         setBusyMode("read");
         const suggestions = SUGGESTIONS[zone.key] ?? { keep: [], replace: [] };
@@ -220,7 +224,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         dispatch({
           type: "upload-ok",
           proposal: {
-            id: `proposal_${crypto.randomUUID()}`,
+            id: proposalId,
             planId: plan.id,
             zoneId,
             beforePhotoId: before.id,
@@ -236,7 +240,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         });
         setBusyZoneId(null);
         setBusyMode(null);
-        return { ok: true };
+        return { ok: true, proposalId };
       },
       async generate(zoneId, options) {
         const current = ref.current;
@@ -274,10 +278,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           dispatch({ type: "generate-failed", planId: plan.id, zoneId });
           return { ok: false };
         }
+        const proposalId = `proposal_${crypto.randomUUID()}`;
         dispatch({
           type: "generate-ok",
           proposal: {
-            id: `proposal_${crypto.randomUUID()}`,
+            id: proposalId,
             planId: plan.id,
             zoneId,
             beforePhotoId: photo.id,
@@ -286,7 +291,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             source: "generated",
           },
         });
-        return { ok: true };
+        return { ok: true, proposalId };
       },
       async pushProject() {
         const current = ref.current;

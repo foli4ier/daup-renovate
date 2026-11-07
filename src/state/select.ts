@@ -1,8 +1,15 @@
 import { zonesOnPhase, phaseName } from "../data/phases";
+import { copy } from "../copy";
 import { assessTotal, linesForZone, type MoneyLine, type TotalReport } from "../lib/budget";
 import { buildZoneScope } from "../lib/scope";
 import { nextStep, pillOf, type LinkSnap, type NextStep, type Pill } from "../lib/status";
-import type { Photo, Plan, PlanLink, Property, Proposal, State, Zone } from "./types";
+import type { Photo, Plan, PlanLink, Property, Proposal, State, Zone, ZoneKind } from "./types";
+
+function kindRank(kind?: ZoneKind): number {
+  if (kind === "outside") return 0;
+  if (kind === "inside") return 1;
+  return 2;
+}
 
 export function activeProperty(state: State): Property | undefined {
   return state.properties.find((property) => property.id === state.activePropertyId) ?? state.properties[0];
@@ -22,7 +29,8 @@ export function propertyZones(state: State, propertyId: string): Zone[] {
     .filter((zone) => zone.propertyId === propertyId)
     .slice()
     .sort((a, b) => {
-      if (a.kind !== b.kind) return a.kind === "outside" ? -1 : 1;
+      const rank = kindRank(a.kind) - kindRank(b.kind);
+      if (rank !== 0) return rank;
       return a.order - b.order;
     });
 }
@@ -160,4 +168,30 @@ export function zonesSettled(state: State, plan: Plan): boolean {
     const pill = zonePill(state, plan.id, zone);
     return pill === "approved" || pill === "skipped";
   });
+}
+
+export function zoneHasAfter(state: State, planId: string, zoneId: string): boolean {
+  return proposalsFor(state, planId, zoneId).length > 0;
+}
+
+/** Gallery when the zone has an after, otherwise capture. */
+export function zonePath(state: State, planId: string, zoneId: string): string {
+  return zoneHasAfter(state, planId, zoneId) ? `/gallery/${zoneId}` : `/zone/${zoneId}`;
+}
+
+/** Last opened zone, or the plan when they have not opened one yet. */
+export function continuePath(state: State): string {
+  const plan = activePlan(state);
+  const property = activeProperty(state);
+  if (!plan || !property || !plan.lastZoneId) return "/plan";
+  const zone = state.zones.find((item) => item.id === plan.lastZoneId && item.propertyId === property.id);
+  if (!zone) return "/plan";
+  return zonePath(state, plan.id, zone.id);
+}
+
+/** Terracotta on the zone list only once every visible zone is approved or skipped. */
+export function zoneListLabel(state: State): string | null {
+  const plan = activePlan(state);
+  if (!plan || !zonesSettled(state, plan)) return null;
+  return copy.seeBudget;
 }

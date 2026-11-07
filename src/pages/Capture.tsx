@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { copy } from "../copy";
 import { SUGGESTIONS, STYLE_CHIPS, TIER_CHIPS } from "../data/guides";
-import { unanswered } from "../data/questions";
-import { ABOUT_ONE_MEGAPIXEL, type StyleId, type Tier } from "../lib/prompt";
+import { needsQuestions } from "../data/questions";
+import { ABOUT_ONE_MEGAPIXEL, capReached, triesLeft, type StyleId, type Tier } from "../lib/prompt";
 import { canOfferAfterUpload } from "../lib/reading";
 import { TopBar } from "../components/Chrome";
-import { activePlan, linkFor, photosFor } from "../state/select";
+import { useZonePicker } from "../components/ZoneNav";
+import { activePlan, linkFor, photosFor, proposalsFor } from "../state/select";
 import { useRenovate } from "../state/store";
 
 const PHOTO_CAP = 6;
@@ -47,6 +48,8 @@ export default function Capture() {
   const [used, setUsed] = useState("");
   const [photoError, setPhotoError] = useState(false);
   const [uploadError, setUploadError] = useState(false);
+  const [keepNote, setKeepNote] = useState(false);
+  const picker = useZonePicker(zoneId);
   const suggestions = SUGGESTIONS[zone?.key ?? ""] ?? { keep: [], replace: [] };
   const hasBefore = canOfferAfterUpload(photos.length);
 
@@ -129,7 +132,7 @@ export default function Capture() {
       setUploadError(true);
       return;
     }
-    navigate(`/gallery/${zoneId}`);
+    navigate(`/gallery/${zoneId}?picture=${result.proposalId}`);
   }
 
   function toggle(list: string[], value: string, kind: "keep" | "replace") {
@@ -141,24 +144,42 @@ export default function Capture() {
 
   async function onGenerate() {
     persist();
-    const pending = unanswered(currentZone.key, currentZone.answers);
-    if (pending.length && currentLink.proposalIds.length === 0) {
+    if (capReached(currentLink.attempts)) return;
+    if (needsQuestions(currentZone.key, currentZone.answers)) {
       dispatch({ type: "questions-pending", planId: currentPlan.id, zoneId, pending: true });
       navigate(`/zone/${zoneId}/questions`);
       return;
     }
-    await generate(zoneId);
-    navigate(`/gallery/${zoneId}`);
+    const result = await generate(zoneId);
+    if (result.ok) navigate(`/gallery/${zoneId}?picture=${result.proposalId}`);
   }
 
   const ready = Boolean(style && (style !== "custom" || styleNote.trim()) && budget && photos.length);
   const small = photos.filter((photo) => photo.width * photo.height < ABOUT_ONE_MEGAPIXEL);
   const reading = busyZoneId === zoneId && busyMode === "read";
   const making = busyZoneId === zoneId && busyMode === "generate";
+  const hasAfters = proposalsFor(state, currentPlan.id, zoneId).length > 0;
+  const left = triesLeft(currentLink.attempts);
 
   return (
-    <div className="page">
-      <TopBar title={zone.name} />
+    <div className="page" {...picker.swipe}>
+      <TopBar
+        title={zone.name}
+        onTitle={() => picker.setOpen(true)}
+        titleOpen={picker.open}
+        extra={
+          hasAfters ? (
+            <button
+              id="see-afters"
+              className="text-btn see-afters"
+              type="button"
+              onClick={() => navigate(`/gallery/${zoneId}`, { replace: true })}
+            >
+              {copy.seeAfters}
+            </button>
+          ) : null
+        }
+      />
       <div className="photo-row">
         {photos.map((photo) => (
           <div key={photo.id} className={photo.starred ? "thumb starred" : "thumb"}>
@@ -172,13 +193,25 @@ export default function Capture() {
             >
               {photo.starred ? "★" : "☆"}
             </button>
-            <button className="text-btn" type="button" onClick={() => dispatch({ type: "remove-photo", photoId: photo.id })}>
+            <button
+              className="text-btn"
+              type="button"
+              onClick={() => {
+                if (photos.length <= 1 && hasAfters) {
+                  setKeepNote(true);
+                  return;
+                }
+                setKeepNote(false);
+                dispatch({ type: "remove-photo", photoId: photo.id });
+              }}
+            >
               Remove.
             </button>
           </div>
         ))}
       </div>
       {photos.some((photo) => photo.starred) ? <p className="meta">{copy.mainPhoto}</p> : null}
+      {keepNote ? <p className="meta">{copy.keepBefore}</p> : null}
       {small.map((photo) => (
         <p key={photo.id} className="photo-warn" style={{ marginTop: 10 }}>
           {copy.smallPhoto(photo.width, photo.height)}
@@ -200,7 +233,7 @@ export default function Capture() {
         </div>
       )}
 
-      {hasBefore ? null : <p className="meta">{copy.addPhotos(zone.name)}</p>}
+      {hasBefore ? null : <p className="meta">{copy.addPhotosTo(zone.name)}</p>}
       <p style={{ marginTop: 16 }}>{copy.tip}</p>
       <p className="meta">{copy.people}</p>
 
@@ -376,11 +409,12 @@ export default function Capture() {
           <button
             className="btn btn-primary btn-wide"
             type="button"
-            disabled={!ready || busyZoneId === zoneId}
+            disabled={!ready || busyZoneId === zoneId || capReached(currentLink.attempts)}
             onClick={() => void onGenerate()}
           >
             {making ? copy.making : copy.generate}
           </button>
+          {left === 0 ? <p className="meta">{copy.triesLeft(left)}</p> : null}
           <input
             ref={afterRef}
             className="sr-only"
@@ -393,8 +427,10 @@ export default function Capture() {
           />
           {!ready ? <p className="meta">{copy.pickStyle}</p> : null}
           {uploadError ? <p className="warn">{copy.uploadFailed}</p> : null}
+          {currentLink.lastFailed ? <p className="warn">{copy.failure}</p> : null}
         </div>
       ) : null}
+      {picker.picker}
     </div>
   );
 }

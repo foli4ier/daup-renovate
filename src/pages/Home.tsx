@@ -2,14 +2,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { copy } from "../copy";
 import { OpenProperty, PropertyCards } from "../components/PropertyStatus";
-import { PushSheet } from "../components/ProjectSheets";
 import { Wordmark } from "../components/Chrome";
 import { Sheet } from "../components/Chrome";
 import { statusLabel } from "../lib/status";
-import { stepHref } from "../state/select";
-import { activePlan, activeProperty, approvedCount, coverUrl, planNext } from "../state/select";
+import { activePlan, activeProperty, approvedCount, continuePath, coverUrl } from "../state/select";
 import { useRenovate } from "../state/store";
-import type { NextStep } from "../lib/status";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -17,29 +14,12 @@ export default function Home() {
   const selected = state.properties.find((item) => item.id === state.activePropertyId);
   const property = state.sample || !unmatchedHouse ? activeProperty(state) : selected;
   const plan = activePlan(state);
-  const next = planNext(state);
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState("");
-  const [push, setPush] = useState(false);
   const others = property ? state.plans.filter((item) => item.propertyId === property.id && item.id !== plan?.id) : [];
-
-  function follow(step: NextStep) {
-    if (step.kind === "start") {
-      setName(property ? `${property.name} refresh` : "");
-      setNaming(true);
-      return;
-    }
-    if (step.kind === "push") {
-      setPush(true);
-      return;
-    }
-    if (step.kind === "project" && plan?.projectUrl) {
-      window.open(plan.projectUrl, "_blank", "noopener,noreferrer");
-      return;
-    }
-    const href = stepHref(step);
-    if (href) navigate(href);
-  }
+  const lastZone = plan?.lastZoneId
+    ? state.zones.find((zone) => zone.id === plan.lastZoneId && zone.propertyId === property?.id)
+    : undefined;
 
   if (!state.sample && propertyLoad === "loading") {
     return (
@@ -99,12 +79,12 @@ export default function Home() {
         <section className="card home-card">
           <p className="kicker">{copy.continuePlan}</p>
           <h2>{plan.name}</h2>
-          <p>{copy.zoneScore(counts.total, counts.approved)}</p>
-          <div className="meter" role="img" aria-label={copy.zoneScore(counts.total, counts.approved)}>
+          <p>{copy.progress(counts.approved, counts.total)}</p>
+          <div className="meter" role="img" aria-label={copy.progress(counts.approved, counts.total)}>
             <span style={{ width: `${counts.total ? (counts.approved / counts.total) * 100 : 0}%` }} />
           </div>
-          <p>Next: {next.label}</p>
-          <button className="btn btn-primary btn-wide" type="button" onClick={() => follow(next)} style={{ marginTop: 8 }}>
+          {lastZone ? <p>{copy.wereOn(lastZone.name)}</p> : null}
+          <button className="btn btn-primary btn-wide" type="button" onClick={() => navigate(continuePath(state))} style={{ marginTop: 8 }}>
             {copy.continue}
           </button>
           {plan.status === "in-project" && plan.projectUrl ? (
@@ -187,7 +167,6 @@ export default function Home() {
           </label>
         </Sheet>
       ) : null}
-      {push ? <PushSheet onClose={() => setPush(false)} /> : null}
     </div>
   );
 }

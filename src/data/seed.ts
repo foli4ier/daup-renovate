@@ -121,6 +121,7 @@ export function seed(): State {
         status: "draft",
         createdAt: "2026-11-06T05:15:00.000Z",
         phasesApproved: false,
+        lastZoneId: "zone_kitchen",
         phases: freshPhases(PLAN),
       },
       {

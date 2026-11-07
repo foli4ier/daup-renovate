@@ -25,7 +25,8 @@ export type Zone = {
   propertyId: string;
   key: string;
   name: string;
-  kind: ZoneKind;
+  /** Missing when the owner named a zone and did not pick inside or outside. */
+  kind?: ZoneKind;
   sizeM2?: number;
   order: number;
   hidden: boolean;
@@ -88,6 +89,8 @@ export type Plan = {
   phasesApproved: boolean;
   projectId?: string;
   projectUrl?: string;
+  /** Last zone the owner opened on this plan. */
+  lastZoneId?: string;
   phases: Phase[];
 };
 

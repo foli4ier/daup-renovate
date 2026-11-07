@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { copy } from "../copy";
+import { AddZoneFields } from "../components/AddZone";
 import { Sheet } from "../components/Chrome";
+import { makeCustomZone } from "../data/zones";
 import { activeProperty, propertyZones } from "../state/select";
 import { useRenovate } from "../state/store";
 import type { Zone, ZoneKind } from "../state/types";
@@ -12,25 +14,15 @@ export function EditZones({ onClose }: { onClose: () => void }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [draftName, setDraftName] = useState("");
-  const [draftKind, setDraftKind] = useState<ZoneKind>("inside");
+  const [draftKind, setDraftKind] = useState<ZoneKind | undefined>(undefined);
   const [merge, setMerge] = useState<{ source: Zone; targetId: string } | null>(null);
   const target = zones.find((zone) => zone.id === merge?.targetId);
 
   function add() {
     if (!property || !draftName.trim()) return;
-    const order = Math.max(0, ...state.zones.map((zone) => zone.order)) + 1;
-    const zone: Zone = {
-      id: `zone_${crypto.randomUUID()}`,
-      propertyId: property.id,
-      key: `custom_${order}`,
-      name: draftName.trim(),
-      kind: draftKind,
-      order,
-      hidden: false,
-      answers: [],
-    };
-    dispatch({ type: "add-zone", zone });
+    dispatch({ type: "add-zone", zone: makeCustomZone(property.id, state.zones, draftName, draftKind) });
     setDraftName("");
+    setDraftKind(undefined);
     setAdding(false);
   }
 
@@ -52,22 +44,13 @@ export function EditZones({ onClose }: { onClose: () => void }) {
           </button>
         ) : (
           <>
-            {adding ? (
-              <div>
-                <label className="field">
-                  Name
-                  <input value={draftName} placeholder={copy.placeholderName} onChange={(event) => setDraftName(event.target.value)} />
-                </label>
-                <div className="chips">
-                  {(["outside", "inside"] as const).map((kind) => (
-                    <button key={kind} type="button" className="choice" aria-pressed={draftKind === kind} onClick={() => setDraftKind(kind)}>
-                      {kind === "outside" ? "Outside." : "Inside."}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            <button className="btn btn-outline btn-wide" type="button" onClick={() => (adding ? add() : setAdding(true))}>
+            {adding ? <AddZoneFields name={draftName} kind={draftKind} onName={setDraftName} onKind={setDraftKind} /> : null}
+            <button
+              className="btn btn-outline btn-wide"
+              type="button"
+              disabled={adding && !draftName.trim()}
+              onClick={() => (adding ? add() : setAdding(true))}
+            >
               {copy.addZone}
             </button>
             <button className="btn btn-primary btn-wide" type="button" onClick={onClose}>
@@ -98,8 +81,8 @@ export function EditZones({ onClose }: { onClose: () => void }) {
               >
                 <span>{zone.name}</span>
                 <span className="meta">
-                  {zone.kind === "outside" ? "Outside" : "Inside"}
-                  {zone.hidden ? " · Hidden" : ""}
+                  {zone.kind === "outside" ? "Outside" : zone.kind === "inside" ? "Inside" : ""}
+                  {zone.hidden ? `${zone.kind ? " · " : ""}Hidden` : ""}
                 </span>
               </button>
               {openId === zone.id ? (

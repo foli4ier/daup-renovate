@@ -37,8 +37,9 @@ export default function Questions() {
       dispatch({ type: "save-answer", zoneId, questionId: answer.questionId, text: answer.text });
     }
     dispatch({ type: "questions-pending", planId: currentPlan.id, zoneId, pending: false });
-    await generate(zoneId);
-    navigate(`/gallery/${zoneId}`);
+    const result = await generate(zoneId);
+    if (result.ok) navigate(`/gallery/${zoneId}?picture=${result.proposalId}`);
+    else navigate(`/gallery/${zoneId}`);
   }
 
   function currentAnswer(): string | null {

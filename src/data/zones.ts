@@ -15,6 +15,21 @@ const TEMPLATE: { key: string; name: string; kind: ZoneKind; order: number; hidd
   { key: "roof", name: "Roof & gutters", kind: "outside", order: 12, hidden: true },
 ];
 
+export function makeCustomZone(propertyId: string, existing: { order: number }[], name: string, kind?: ZoneKind): Zone {
+  const order = Math.max(0, ...existing.map((zone) => zone.order)) + 1;
+  const zone: Zone = {
+    id: `zone_${crypto.randomUUID()}`,
+    propertyId,
+    key: `custom_${order}`,
+    name: name.trim(),
+    order,
+    hidden: false,
+    answers: [],
+  };
+  if (kind) zone.kind = kind;
+  return zone;
+}
+
 export function defaultZones(propertyId: string): Zone[] {
   return TEMPLATE.map((item) => ({
     id: `zone_${propertyId}_${item.key}`,

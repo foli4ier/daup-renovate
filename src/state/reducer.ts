@@ -15,6 +15,7 @@ export type Action =
   | { type: "hydrate-properties"; properties: DaupProperty[]; prefer?: PropertyPrefer }
   | { type: "select-property"; propertyId: string }
   | { type: "select-plan"; planId: string }
+  | { type: "visit-zone"; planId: string; zoneId: string }
   | { type: "start-plan"; plan: Plan }
   | { type: "rename-zone"; zoneId: string; name: string }
   | { type: "set-zone-kind"; zoneId: string; kind: ZoneKind }
@@ -114,6 +115,11 @@ export function reduce(state: State, action: Action): State {
     }
     case "select-plan":
       return { ...state, activePlanId: action.planId };
+    case "visit-zone":
+      return {
+        ...state,
+        plans: state.plans.map((plan) => (plan.id === action.planId ? { ...plan, lastZoneId: action.zoneId } : plan)),
+      };
     case "start-plan": {
       const zones = state.zones.filter((zone) => zone.propertyId === action.plan.propertyId);
       return {
@@ -209,6 +215,9 @@ export function reduce(state: State, action: Action): State {
     case "remove-photo": {
       const gone = state.photos.find((photo) => photo.id === action.photoId);
       if (!gone) return state;
+      const zoneCount = state.photos.filter((photo) => photo.zoneId === gone.zoneId).length;
+      const hasAfter = state.proposals.some((proposal) => proposal.zoneId === gone.zoneId);
+      if (hasAfter && zoneCount <= 1) return state;
       const rest = state.photos.filter((photo) => photo.id !== action.photoId);
       const zonePhotos = rest.filter((photo) => photo.zoneId === gone.zoneId);
       if (gone.starred && zonePhotos.length && !zonePhotos.some((photo) => photo.starred)) {

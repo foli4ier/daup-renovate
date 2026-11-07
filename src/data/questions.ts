@@ -93,6 +93,11 @@ export function unanswered(zoneKey: string, answers: { questionId: string }[]): 
   return questionsFor(zoneKey).filter((question) => !done.has(question.id));
 }
 
+/** Questions run on the first generate only, before this zone has any saved answer. */
+export function needsQuestions(zoneKey: string, answers: { questionId: string }[]): boolean {
+  return answers.length === 0 && unanswered(zoneKey, answers).length > 0;
+}
+
 export function answersForSkip(
   zoneKey: string,
   pending: { id: string }[],

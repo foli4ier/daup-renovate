@@ -160,6 +160,11 @@ describe("uploaded after", () => {
     assert.deepEqual(link?.proposalIds.slice(-2), ["up_front", "gen_front"]);
     assert.equal(link?.attempts, 2);
     assert.equal(generated.proposals.filter((item) => item.zoneId === "zone_front" && item.source === "uploaded").length, 1);
+    const approved = reduce(generated, { type: "approve", planId: PLAN, zoneId: "zone_front", proposalId: "gen_front" });
+    const chosen = approved.links.find((item) => item.zoneId === "zone_front");
+    assert.equal(chosen?.approvedProposalId, "gen_front");
+    assert.ok(chosen?.proposalIds.includes("up_front"));
+    assert.ok(chosen?.proposalIds.includes("gen_front"));
   });
 
   it("does not overwrite a zone that picked its own style chip", () => {

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { copy } from "../src/copy.ts";
 import { seed } from "../src/data/seed.ts";
-import { propertyZones } from "../src/state/select.ts";
-import { answersForSkip } from "../src/data/questions.ts";
+import { continuePath, propertyZones, visibleZones, zoneListLabel, zonePath } from "../src/state/select.ts";
+import { answersForSkip, needsQuestions } from "../src/data/questions.ts";
 import { assessTotal, linesForZone } from "../src/lib/budget.ts";
 import { findLeak } from "../src/lib/leak.ts";
 import { buildEditPrompt } from "../src/lib/prompt.ts";
@@ -113,6 +113,12 @@ describe("questions", () => {
     assert.equal(answers[0]?.text, "Concrete.");
     assert.equal(answers[1]?.text, "Repaint it.");
   });
+
+  it("asks on the first generate only, then uses the saved answers", () => {
+    assert.equal(needsQuestions("front", []), true);
+    assert.equal(needsQuestions("kitchen", [{ questionId: "use", text: "Home kitchen." }]), false);
+    assert.equal(needsQuestions("kitchen", []), true);
+  });
 });
 
 describe("next step", () => {
@@ -188,6 +194,77 @@ describe("zone changes", () => {
     assert.equal(starred?.sourceName, "Kombuis__kitchen_3.jpeg");
   });
 
+  it("puts a named zone in its group, or at the end when inside or outside was not picked", () => {
+    const state = seed();
+    const outside = reduce(state, {
+      type: "add-zone",
+      zone: {
+        id: "zone_patio",
+        propertyId: "prop_esseboom",
+        key: "custom_patio",
+        name: "Patio",
+        kind: "outside",
+        order: 20,
+        hidden: false,
+        answers: [],
+      },
+    });
+    const outsideNames = propertyZones(outside, "prop_esseboom")
+      .filter((zone) => !zone.hidden)
+      .map((zone) => zone.name);
+    assert.ok(outsideNames.indexOf("Patio") > outsideNames.indexOf("Side yard"));
+    assert.ok(outsideNames.indexOf("Patio") < outsideNames.indexOf("Living area"));
+    const unnamed = reduce(state, {
+      type: "add-zone",
+      zone: {
+        id: "zone_loft",
+        propertyId: "prop_esseboom",
+        key: "custom_loft",
+        name: "Loft",
+        order: 21,
+        hidden: false,
+        answers: [],
+      },
+    });
+    const end = propertyZones(unnamed, "prop_esseboom")
+      .filter((zone) => !zone.hidden)
+      .map((zone) => zone.name);
+    assert.equal(end.at(-1), "Loft");
+  });
+
+  it("keeps the last before once an after exists", () => {
+    const state = seed();
+    const blocked = reduce(state, { type: "remove-photo", photoId: "photo_front" });
+    assert.equal(blocked.photos.some((photo) => photo.id === "photo_front"), true);
+    const one = reduce(state, { type: "remove-photo", photoId: "photo_sink" });
+    assert.equal(one.photos.some((photo) => photo.id === "photo_sink"), false);
+    const last = reduce(one, { type: "remove-photo", photoId: "photo_cabinets" });
+    assert.equal(last.photos.some((photo) => photo.id === "photo_cabinets"), true);
+  });
+
+  it("continues the last zone, and opens the plan before any zone is opened", () => {
+    const state = seed();
+    assert.equal(continuePath(state), "/gallery/zone_kitchen");
+    assert.equal(zonePath(state, "plan_refresh", "zone_back"), "/zone/zone_back");
+    const fresh = reduce(state, { type: "visit-zone", planId: "plan_refresh", zoneId: "" });
+    const cleared = {
+      ...fresh,
+      plans: fresh.plans.map((plan) => (plan.id === "plan_refresh" ? { ...plan, lastZoneId: undefined } : plan)),
+    };
+    assert.equal(continuePath(cleared), "/plan");
+  });
+
+  it("shows See budget only when every visible zone is approved or skipped", () => {
+    const state = seed();
+    assert.equal(zoneListLabel(state), null);
+    let next = state;
+    for (const zone of visibleZones(state, "prop_esseboom")) {
+      next = reduce(next, { type: "skip-zone", planId: "plan_refresh", zoneId: zone.id });
+    }
+    assert.equal(zoneListLabel(next), copy.seeBudget);
+    assert.equal(next.zones.some((zone) => zone.hidden && !next.links.find((link) => link.zoneId === zone.id)?.skipped), true);
+  });
+
   it("does not count a failed picture toward the cap", () => {
     const state = seed();
     const before = state.links.find((link) => link.zoneId === "zone_front");
@@ -217,6 +294,12 @@ describe("owner copy", () => {
     copy.done,
     copy.back,
     copy.tryAgain,
+    copy.addPhotos,
+    copy.addZone,
+    copy.seeAfters,
+    copy.seeBudget,
+    copy.approved,
+    copy.wereOn("Kitchen"),
     copy.uploadAfter,
     copy.generateAfter,
     copy.fromYourAfter,
@@ -237,5 +320,16 @@ describe("owner copy", () => {
   });
   it("uses the locked impression line", () => {
     assert.equal(copy.impression, "After-images are AI impressions, not designs; proportions and details may differ.");
+  });
+  it("uses the workspace labels", () => {
+    assert.equal(copy.addZone, "Add a zone.");
+    assert.equal(copy.addPhotos, "Add photos.");
+    assert.equal(copy.seeAfters, "See afters.");
+    assert.equal(copy.seeBudget, "See budget.");
+    assert.equal(copy.tryAgain, "Try again.");
+    assert.equal(copy.approved, "Approved.");
+    assert.equal(copy.wereOn("Kitchen"), "You were on Kitchen.");
+    assert.equal(copy.sixLimit, "You already have six photos. Remove one to add another.");
+    assert.equal(copy.keepBefore, "Keep at least one before — CallOut needs it.");
   });
 });

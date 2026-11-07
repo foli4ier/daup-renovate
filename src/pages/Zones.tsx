@@ -1,27 +1,29 @@
 import { useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { copy } from "../copy";
-import { ActionBar, Wordmark } from "../components/Chrome";
+import { AddZoneFields } from "../components/AddZone";
+import { ActionBar, Sheet, Wordmark } from "../components/Chrome";
 import { PillView } from "../components/Chrome";
-import { PushSheet } from "../components/ProjectSheets";
-import { stepHref } from "../state/select";
-import { activePlan, activeProperty, approvedCount, photosFor, planNext, propertyZones, zonePill } from "../state/select";
+import { makeCustomZone } from "../data/zones";
+import { activePlan, activeProperty, approvedCount, photosFor, propertyZones, zoneListLabel, zonePath, zonePill } from "../state/select";
 import { useRenovate } from "../state/store";
+import type { ZoneKind } from "../state/types";
 import { EditZones } from "./EditZones";
 
 export default function Zones() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const { state } = useRenovate();
+  const { state, dispatch } = useRenovate();
   const property = activeProperty(state);
   const plan = activePlan(state);
   const editing = params.get("edit") === "1";
   const [hiddenOpen, setHiddenOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [draftKind, setDraftKind] = useState<ZoneKind | undefined>(undefined);
   const [peek, setPeek] = useState<string | null>(null);
   const held = useRef(false);
   const holdTimer = useRef<number | null>(null);
-  const [sheet, setSheet] = useState<"push" | null>(null);
-  const next = planNext(state);
 
   if (!property || !plan) {
     return (
@@ -38,36 +40,32 @@ export default function Zones() {
   }
 
   const currentPlan = plan;
-  const zones = propertyZones(state, property.id);
+  const house = property;
+  const zones = propertyZones(state, house.id);
   const visible = zones.filter((zone) => !zone.hidden);
   const hidden = zones.filter((zone) => zone.hidden);
   const counts = approvedCount(state, plan);
+  const settledLabel = zoneListLabel(state);
 
   function openZone(zoneId: string) {
     const zone = zones.find((item) => item.id === zoneId);
     if (!zone) return;
-    const pill = zonePill(state, currentPlan.id, zone);
-    if (pill === "review" || pill === "approved") navigate(`/gallery/${zoneId}`);
-    else if (pill === "questions") navigate(`/zone/${zoneId}/questions`);
-    else navigate(`/zone/${zoneId}`);
+    navigate(zonePath(state, currentPlan.id, zone.id));
   }
 
-  function follow() {
-    if (next.kind === "push") {
-      setSheet("push");
-      return;
-    }
-    if (next.kind === "project" && currentPlan.projectUrl) {
-      window.open(currentPlan.projectUrl, "_blank", "noopener,noreferrer");
-      return;
-    }
-    const href = stepHref(next);
-    if (href) navigate(href);
-    else navigate("/");
+  function addZone() {
+    const name = draftName.trim();
+    if (!name) return;
+    const zone = makeCustomZone(house.id, state.zones, name, draftKind);
+    dispatch({ type: "add-zone", zone });
+    setDraftName("");
+    setDraftKind(undefined);
+    setAdding(false);
+    navigate(`/zone/${zone.id}`);
   }
 
   return (
-    <div className={`page ${editing || sheet ? "" : "has-action"}`}>
+    <div className={`page ${editing || adding || !settledLabel ? "" : "has-action"}`}>
       <Wordmark />
       <p className="kicker">Plan</p>
       <h1>{plan.name}</h1>
@@ -75,18 +73,6 @@ export default function Zones() {
       <button className="text-btn" type="button" onClick={() => setParams({ edit: "1" })}>
         {copy.editZones}
       </button>
-      {hidden.length ? (
-        <button className="text-btn" type="button" onClick={() => setHiddenOpen((open) => !open)}>
-          {copy.hidden(hidden.length)}
-        </button>
-      ) : null}
-      {hiddenOpen ? (
-        <ul>
-          {hidden.map((zone) => (
-            <li key={zone.id}>{zone.name}</li>
-          ))}
-        </ul>
-      ) : null}
       <div className="zone-grid">
         {visible.map((zone) => {
           const photos = photosFor(state, zone.id);
@@ -143,15 +129,47 @@ export default function Zones() {
           );
         })}
       </div>
-      {editing || sheet ? null : (
+      <button id="add-zone" className="btn btn-outline btn-wide add-zone" type="button" onClick={() => setAdding(true)}>
+        {copy.addZone}
+      </button>
+      {hidden.length ? (
+        <button className="text-btn" type="button" onClick={() => setHiddenOpen((open) => !open)}>
+          {copy.hidden(hidden.length)}
+        </button>
+      ) : null}
+      {hiddenOpen
+        ? hidden.map((zone) => (
+            <button key={zone.id} className="zone-row" type="button" onClick={() => openZone(zone.id)}>
+              <span>{zone.name}</span>
+              <PillView pill={zonePill(state, plan.id, zone)} />
+            </button>
+          ))
+        : null}
+      {editing || adding || !settledLabel ? null : (
         <ActionBar>
-          <button className="btn btn-primary btn-wide" type="button" onClick={follow}>
-            {next.label}
+          <button className="btn btn-primary btn-wide" type="button" onClick={() => navigate("/budget")}>
+            {settledLabel}
           </button>
         </ActionBar>
       )}
       {editing ? <EditZones onClose={() => setParams({})} /> : null}
-      {sheet === "push" ? <PushSheet onClose={() => setSheet(null)} /> : null}
+      {adding ? (
+        <Sheet
+          title={copy.addZone}
+          onClose={() => {
+            setAdding(false);
+            setDraftName("");
+            setDraftKind(undefined);
+          }}
+          footer={
+            <button className="btn btn-primary btn-wide" type="button" disabled={!draftName.trim()} onClick={addZone}>
+              {copy.addZone}
+            </button>
+          }
+        >
+          <AddZoneFields name={draftName} kind={draftKind} onName={setDraftName} onKind={setDraftKind} />
+        </Sheet>
+      ) : null}
     </div>
   );
 }
