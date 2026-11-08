@@ -66,7 +66,7 @@ export default function Zones() {
   return (
     <div className={`page ${editing || adding || !settledLabel ? "" : "has-action"}`}>
       <Wordmark />
-      <p className="kicker">Plan</p>
+      <p className="kicker">{copy.zonesWord}</p>
       <h1>{plan.name}</h1>
       <p className="meta">{copy.progress(counts.approved, counts.total)}</p>
       <button className="text-btn" type="button" onClick={() => setParams({ edit: "1" })}>

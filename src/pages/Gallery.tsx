@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { copy } from "../copy";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { copy, galleryRetryLabel } from "../copy";
 import { styleLabel, tierLabel } from "../data/guides";
 import { ActionBar, BeforeAfter, Sheet, TopBar } from "../components/Chrome";
 import { useZonePicker } from "../components/ZoneNav";
 import { whatChanges } from "../lib/changes";
 import { ABOUT_ONE_MEGAPIXEL, triesLeft } from "../lib/prompt";
-import { activePlan, linkFor, photosFor, proposalsFor } from "../state/select";
+import { activePlan, linkFor, photosFor, proposalsFor, starredPhoto } from "../state/select";
 import { useRenovate } from "../state/store";
 
 export default function Gallery() {
@@ -19,6 +19,7 @@ export default function Gallery() {
   const [picked, setPicked] = useState<string | null>(null);
   const [driftOpen, setDriftOpen] = useState(false);
   const [keepDraft, setKeepDraft] = useState("");
+  const [unapproved, setUnapproved] = useState(false);
 
   if (!plan) {
     return (
@@ -40,7 +41,9 @@ export default function Gallery() {
     pictures.find((item) => item.id === requested) ??
     approvedPicture ??
     pictures[pictures.length - 1];
-  const before = current ? state.photos.find((photo) => photo.id === current.beforePhotoId) : photosFor(state, zone?.id ?? "")[0];
+  const before =
+    (current ? state.photos.find((photo) => photo.id === current.beforePhotoId) : undefined) ??
+    starredPhoto(photosFor(state, zone?.id ?? ""));
   const left = triesLeft(link?.attempts ?? 0);
   const hasUpload = pictures.some((item) => item.source === "uploaded");
   const showingUploaded = current?.source === "uploaded";
@@ -72,12 +75,35 @@ export default function Gallery() {
     navigate(`/zone/${zone.id}`);
   }
 
+  function removeAfter(proposalId: string) {
+    if (!zone || !link) return;
+    const approved = link.approvedProposalId === proposalId;
+    dispatch({ type: "remove-proposal", planId: currentPlan.id, zoneId: zone.id, proposalId });
+    if (picked === proposalId) setPicked(null);
+    if (approved) setUnapproved(true);
+  }
+
   return (
     <div className={`page ${driftOpen ? "" : "has-skip"}`} {...picker.swipe}>
-      <TopBar title={zone?.name} onTitle={zone ? () => picker.setOpen(true) : undefined} titleOpen={picker.open} />
+      <TopBar
+        title={zone?.name}
+        onTitle={zone ? () => picker.setOpen(true) : undefined}
+        titleOpen={picker.open}
+        extra={
+          zone ? (
+            <div className="top-actions">
+              <Link className="text-btn" to={`/zone/${zone.id}/chat?from=gallery`}>
+                {copy.chat}
+              </Link>
+            </div>
+          ) : null
+        }
+      />
       <div className="photo-stage">
         {current && before ? (
           <BeforeAfter before={before.url} after={current.imageUrl} />
+        ) : before ? (
+          <img className="before-only" src={before.url} alt="" />
         ) : link?.lastFailed ? (
           <p className="warn">{copy.failure}</p>
         ) : (
@@ -134,19 +160,31 @@ export default function Gallery() {
           </ul>
         </>
       ) : null}
-      {pictures.length ? (
+      {zone ? (
         <div className="photo-row" id="proposal-thumbs" style={{ marginTop: 12 }}>
-          {pictures.map((picture) => (
-            <button
-              key={picture.id}
-              type="button"
-              className="thumb"
-              aria-pressed={picture.id === current?.id}
-              onClick={() => setPicked(picture.id)}
-            >
-              <img src={picture.imageUrl} alt={picture.source === "uploaded" ? "Uploaded after" : "Generated after"} />
-            </button>
-          ))}
+          {pictures.map((picture) => {
+            const selected = picture.id === current?.id;
+            return (
+              <div key={picture.id} className={selected ? "thumb after-thumb selected" : "thumb after-thumb"}>
+                <button
+                  type="button"
+                  className="thumb-pick"
+                  aria-pressed={selected}
+                  onClick={() => setPicked(picture.id)}
+                >
+                  <img src={picture.imageUrl} alt={picture.source === "uploaded" ? "Uploaded after" : "Generated after"} />
+                </button>
+                {selected ? (
+                  <button className="text-btn" type="button" onClick={() => removeAfter(picture.id)}>
+                    {copy.remove}
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+          <button id="add-after" className="thumb add-tile" type="button" onClick={() => navigate(`/zone/${zone.id}`)}>
+            {copy.addAfter}
+          </button>
         </div>
       ) : null}
       {zone && link && !driftOpen ? (
@@ -154,12 +192,14 @@ export default function Gallery() {
           <button id="add-photos" className="btn btn-outline" type="button" onClick={() => navigate(`/zone/${zone.id}`)}>
             {copy.addPhotos}
           </button>
-          <button id="try-again" className="btn btn-outline" type="button" onClick={() => navigate(`/zone/${zone.id}`)}>
-            {copy.tryAgain}
+          <button id="edit-after" className="btn btn-outline" type="button" onClick={() => navigate(`/zone/${zone.id}`)}>
+            {galleryRetryLabel(link.attempts, hasUpload)}
           </button>
         </div>
       ) : null}
-      {showingUploaded ? <p className="meta impression">{copy.uploadedAfter}</p> : <p className="meta impression">{copy.impression}</p>}
+      {current ? (
+        showingUploaded ? <p className="meta impression">{copy.uploadedAfter}</p> : <p className="meta impression">{copy.impression}</p>
+      ) : null}
       {link?.lastFailed ? <p className="warn" style={{ marginTop: 10 }}>{copy.failure}</p> : null}
       {busyZoneId === zone?.id ? <p className="meta">{copy.making}</p> : null}
       {zone && link && !driftOpen ? (
@@ -179,6 +219,7 @@ export default function Gallery() {
 
       {driftOpen || !zone || !link ? null : (
         <ActionBar>
+          {unapproved ? <p className="warn">{copy.noLongerApproved}</p> : null}
           <button
             id="approve"
             className="btn btn-primary btn-wide"
@@ -188,6 +229,7 @@ export default function Gallery() {
             onClick={() => {
               if (!current || showingApproved) return;
               dispatch({ type: "approve", planId: plan.id, zoneId: zone.id, proposalId: current.id });
+              setUnapproved(false);
             }}
           >
             {showingApproved ? copy.approved : copy.approve}
@@ -210,8 +252,8 @@ export default function Gallery() {
           title={copy.drift}
           onClose={() => setDriftOpen(false)}
           footer={
-            <button id="drift-try" className="btn btn-primary btn-wide" type="button" onClick={saveKeepAndOpenCapture}>
-              {copy.tryAgain}
+            <button id="drift-edit" className="btn btn-primary btn-wide" type="button" onClick={saveKeepAndOpenCapture}>
+              {copy.edit}
             </button>
           }
         >

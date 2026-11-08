@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { copy } from "../copy";
 import { SUGGESTIONS, STYLE_CHIPS, TIER_CHIPS } from "../data/guides";
-import { needsQuestions } from "../data/questions";
 import { ABOUT_ONE_MEGAPIXEL, capReached, triesLeft, type StyleId, type Tier } from "../lib/prompt";
 import { canOfferAfterUpload } from "../lib/reading";
 import { TopBar } from "../components/Chrome";
@@ -73,7 +72,6 @@ export default function Capture() {
   }
 
   const currentPlan = plan;
-  const currentZone = zone;
   const currentLink = link;
   const fromZone = currentLink.styleFromZoneId
     ? state.zones.find((item) => item.id === currentLink.styleFromZoneId)
@@ -145,11 +143,6 @@ export default function Capture() {
   async function onGenerate() {
     persist();
     if (capReached(currentLink.attempts)) return;
-    if (needsQuestions(currentZone.key, currentZone.answers)) {
-      dispatch({ type: "questions-pending", planId: currentPlan.id, zoneId, pending: true });
-      navigate(`/zone/${zoneId}/questions`);
-      return;
-    }
     const result = await generate(zoneId);
     if (result.ok) navigate(`/gallery/${zoneId}?picture=${result.proposalId}`);
   }
@@ -168,16 +161,21 @@ export default function Capture() {
         onTitle={() => picker.setOpen(true)}
         titleOpen={picker.open}
         extra={
-          hasAfters ? (
-            <button
-              id="see-afters"
-              className="text-btn see-afters"
-              type="button"
-              onClick={() => navigate(`/gallery/${zoneId}`, { replace: true })}
-            >
-              {copy.seeAfters}
-            </button>
-          ) : null
+          <div className="top-actions">
+            {hasAfters ? (
+              <button
+                id="see-afters"
+                className="text-btn see-afters"
+                type="button"
+                onClick={() => navigate(`/gallery/${zoneId}`, { replace: true })}
+              >
+                {copy.seeAfters}
+              </button>
+            ) : null}
+            <Link className="text-btn" to={`/zone/${zoneId}/chat?from=capture`}>
+              {copy.chat}
+            </Link>
+          </div>
         }
       />
       <div className="photo-stage">
@@ -206,7 +204,7 @@ export default function Capture() {
                 dispatch({ type: "remove-photo", photoId: photo.id });
               }}
             >
-              Remove.
+              {copy.remove}
             </button>
           </div>
         ))}

@@ -58,7 +58,7 @@ export type NextStep = {
   kind: NextKind;
   label: string;
   zoneId?: string;
-  dest?: "capture" | "questions" | "gallery";
+  dest?: "capture" | "chat" | "gallery";
 };
 
 export type NextZone = {
@@ -103,7 +103,7 @@ export function nextStep(input: {
     return { kind: "zone", zoneId: first.zone.id, dest: "capture", label: copy.addPhotosTo(first.zone.name) };
   }
   if (first.pill === "questions") {
-    return { kind: "zone", zoneId: first.zone.id, dest: "questions", label: copy.answerFor(first.zone.name) };
+    return { kind: "zone", zoneId: first.zone.id, dest: "chat", label: copy.answerFor(first.zone.name) };
   }
   if (first.pill === "review") {
     return { kind: "zone", zoneId: first.zone.id, dest: "gallery", label: copy.review(first.zone.name) };

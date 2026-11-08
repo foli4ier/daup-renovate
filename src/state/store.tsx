@@ -18,7 +18,7 @@ import { hasPictureRefs, loadOwner, readStoredOwner, saveOwner } from "./persist
 import { pictureDb } from "./pictureDb";
 import { reduce, type Action } from "./reducer";
 import { activePlan, activeProperty, budgetLines, linkFor, photosFor, proposalsFor, scopeFor, starredPhoto } from "./select";
-import type { CalloutRequest, Photo, State, Zone, ZoneKind } from "./types";
+import { withMessages, type CalloutRequest, type Photo, type State, type Zone, type ZoneKind } from "./types";
 
 export type PropertyLoad = "loading" | "ready" | "error";
 
@@ -73,7 +73,7 @@ function loadSample(): State {
     const raw = sessionStorage.getItem(SAMPLE_SESSION_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as State;
-      if (parsed.version === 2 && parsed.sample) return parsed;
+      if (parsed.version === 2 && parsed.sample) return withMessages(parsed);
     }
   } catch {
     /* start a fresh sample */

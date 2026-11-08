@@ -215,6 +215,7 @@ export function seed(): State {
       },
     ],
     requests: [],
+    messages: [],
     activePropertyId: PROPERTY,
     activePlanId: PLAN,
   };
@@ -239,6 +240,7 @@ export function emptyState(): State {
     links: [],
     proposals: [],
     requests: [],
+    messages: [],
     activePropertyId: "",
     activePlanId: null,
   };

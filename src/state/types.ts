@@ -104,6 +104,17 @@ export type CalloutRequest = {
   createdAt: string;
 };
 
+/** One line in a zone thread. Chips are the answers offered on a question. */
+export type ThreadMessage = {
+  id: string;
+  zoneId: string;
+  authorId: string;
+  text: string;
+  createdAt: string;
+  chips?: string[];
+  questionId?: string;
+};
+
 export type State = {
   version: 2;
   sample: boolean;
@@ -114,9 +125,15 @@ export type State = {
   links: PlanLink[];
   proposals: Proposal[];
   requests: CalloutRequest[];
+  /** Zone threads. The owner posts for now; authorId is ready for other people. */
+  messages: ThreadMessage[];
   activePropertyId: string;
   activePlanId: string | null;
 };
+
+export function withMessages(state: State): State {
+  return Array.isArray(state.messages) ? state : { ...state, messages: [] };
+}
 
 export function emptyLink(planId: string, zoneId: string): PlanLink {
   return {

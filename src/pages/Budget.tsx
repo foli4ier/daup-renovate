@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { copy } from "../copy";
 import { tierLabel } from "../data/guides";
-import { ActionBar, TopBar } from "../components/Chrome";
+import { ActionBar, Wordmark } from "../components/Chrome";
 import { formatRand, formatRange } from "../lib/money";
 import { rateGuide, tierTotal, type MoneyLine } from "../lib/budget";
 import type { Tier } from "../lib/prompt";
@@ -54,7 +54,8 @@ export default function Budget() {
   if (!plan) {
     return (
       <div className="page">
-        <TopBar />
+        <Wordmark />
+        <h1>Estimate</h1>
         <p>{copy.startPlan}</p>
       </div>
     );
@@ -70,8 +71,11 @@ export default function Budget() {
 
   return (
     <div className="page has-action">
-      <TopBar title="Estimate" />
+      <Wordmark />
+      <h1>Estimate</h1>
       <p className="banner">{copy.bannerEstimate}</p>
+      <p>{copy.youOnly}</p>
+      <p className="meta">{copy.budgetsStay}</p>
       {groups.length === 0 ? (
         <>
           <p style={{ marginTop: 16 }}>{copy.approveFirst}</p>

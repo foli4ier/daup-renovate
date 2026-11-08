@@ -5,12 +5,11 @@ import { useRenovate } from "./state/store";
 import Budget from "./pages/Budget";
 import Callout from "./pages/Callout";
 import Capture from "./pages/Capture";
+import Chat, { QuestionsRedirect } from "./pages/Chat";
 import Gallery from "./pages/Gallery";
 import Home from "./pages/Home";
 import Properties from "./pages/Properties";
-import Questions from "./pages/Questions";
 import Work from "./pages/Work";
-import You from "./pages/You";
 import Zones from "./pages/Zones";
 
 export default function App() {
@@ -24,9 +23,10 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/properties" element={<Properties />} />
         <Route path="/plan" element={<Zones />} />
-        <Route path="/you" element={<You />} />
+        <Route path="/you" element={<Navigate to="/budget" replace />} />
         <Route path="/zone/:zoneId" element={<Capture />} />
-        <Route path="/zone/:zoneId/questions" element={<Questions />} />
+        <Route path="/zone/:zoneId/chat" element={<Chat />} />
+        <Route path="/zone/:zoneId/questions" element={<QuestionsRedirect />} />
         <Route path="/gallery/:zoneId" element={<Gallery />} />
         <Route path="/budget" element={<Budget />} />
         <Route path="/work" element={<Work />} />

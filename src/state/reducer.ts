@@ -6,7 +6,8 @@ import { defaultZones } from "../data/zones";
 import { withSharedLook } from "../lib/look";
 import type { StyleId, Tier } from "../lib/prompt";
 import { canOfferAfterUpload } from "../lib/reading";
-import { emptyLink, type CalloutRequest, type Photo, type Plan, type Proposal, type State, type Zone, type ZoneKind } from "./types";
+import { postThreadMessage, seedZoneThread } from "../lib/thread";
+import { emptyLink, withMessages, type CalloutRequest, type Photo, type Plan, type Proposal, type State, type Zone, type ZoneKind } from "./types";
 
 const PHOTO_CAP = 6;
 
@@ -37,6 +38,17 @@ export type Action =
   | { type: "questions-pending"; planId: string; zoneId: string; pending: boolean }
   | { type: "generate-failed"; planId: string; zoneId: string }
   | { type: "generate-ok"; proposal: Proposal }
+  | { type: "remove-proposal"; planId: string; zoneId: string; proposalId: string }
+  | { type: "seed-thread"; zoneId: string; ownerId: string; now: string }
+  | {
+      type: "post-message";
+      id: string;
+      zoneId: string;
+      authorId: string;
+      text: string;
+      createdAt: string;
+      questionId?: string;
+    }
   | { type: "approve"; planId: string; zoneId: string; proposalId: string }
   | { type: "skip-zone"; planId: string; zoneId: string }
   | { type: "move-phase"; planId: string; phaseId: string; direction: "up" | "down" }
@@ -68,7 +80,7 @@ function mapLink(state: State, planId: string, zoneId: string, edit: (link: Stat
 export function reduce(state: State, action: Action): State {
   switch (action.type) {
     case "replace":
-      return action.state.version === 2 ? action.state : emptyState();
+      return action.state.version === 2 ? withMessages(action.state) : emptyState();
     case "hydrate-properties": {
       const incoming = action.properties;
       let zones = state.zones.filter((zone) => incoming.some((property) => property.id === zone.propertyId));
@@ -102,6 +114,7 @@ export function reduce(state: State, action: Action): State {
         links: state.links.filter((link) => planIds.has(link.planId) && zoneIds.has(link.zoneId)),
         proposals: state.proposals.filter((proposal) => planIds.has(proposal.planId) && zoneIds.has(proposal.zoneId)),
         requests: state.requests.filter((request) => planIds.has(request.planId)),
+        messages: (state.messages ?? []).filter((message) => zoneIds.has(message.zoneId)),
         activePropertyId,
         activePlanId,
         sample: false,
@@ -197,6 +210,9 @@ export function reduce(state: State, action: Action): State {
         }),
         proposals: state.proposals.filter((proposal) => proposal.zoneId !== source.id),
         links: state.links.filter((link) => link.zoneId !== source.id),
+        messages: (state.messages ?? []).map((message) =>
+          message.zoneId === source.id ? { ...message, zoneId: target.id } : message,
+        ),
       };
     }
     case "add-photo": {
@@ -343,6 +359,31 @@ export function reduce(state: State, action: Action): State {
         lastFailed: true,
         questionsPending: false,
       }));
+    case "remove-proposal": {
+      const proposal = state.proposals.find(
+        (item) => item.id === action.proposalId && item.planId === action.planId && item.zoneId === action.zoneId,
+      );
+      if (!proposal) return state;
+      const generated = proposal.source !== "uploaded";
+      return {
+        ...state,
+        proposals: state.proposals.filter((item) => item.id !== proposal.id),
+        links: state.links.map((link) => {
+          if (link.planId !== proposal.planId || link.zoneId !== proposal.zoneId) return link;
+          const next = {
+            ...link,
+            proposalIds: link.proposalIds.filter((id) => id !== proposal.id),
+            attempts: generated ? Math.max(0, link.attempts - 1) : link.attempts,
+          };
+          if (link.approvedProposalId === proposal.id) next.approvedProposalId = undefined;
+          return next;
+        }),
+      };
+    }
+    case "seed-thread":
+      return seedZoneThread(state, action.zoneId, action.ownerId, action.now);
+    case "post-message":
+      return postThreadMessage(state, action);
     case "generate-ok":
       return {
         ...state,
