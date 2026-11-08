@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { copy, galleryRetryLabel } from "../copy";
 import { styleLabel, tierLabel } from "../data/guides";
-import { ActionBar, BeforeAfter, Sheet, TopBar } from "../components/Chrome";
+import { GalleryStage } from "../components/AfterViewer";
+import { ActionBar, Sheet, TopBar } from "../components/Chrome";
 import { useZonePicker } from "../components/ZoneNav";
 import { whatChanges } from "../lib/changes";
 import { ABOUT_ONE_MEGAPIXEL, triesLeft } from "../lib/prompt";
@@ -99,17 +100,13 @@ export default function Gallery() {
           ) : null
         }
       />
-      <div className="photo-stage">
-        {current && before ? (
-          <BeforeAfter before={before.url} after={current.imageUrl} />
-        ) : before ? (
-          <img className="before-only" src={before.url} alt="" />
-        ) : link?.lastFailed ? (
-          <p className="warn">{copy.failure}</p>
-        ) : (
-          <div className="ph">No picture yet</div>
-        )}
-      </div>
+      <GalleryStage
+        beforeUrl={before?.url}
+        pictures={pictures}
+        selectedId={current?.id}
+        onSelect={setPicked}
+        empty={link?.lastFailed ? <p className="warn">{copy.failure}</p> : <div className="ph">No picture yet</div>}
+      />
       {smallAfter ? (
         <p className="photo-warn" style={{ marginTop: 10 }}>
           {smallAfter}

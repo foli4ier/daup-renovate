@@ -27,7 +27,7 @@ import { withMessages, type CalloutRequest, type Photo, type State, type Zone, t
 
 export type PropertyLoad = "loading" | "ready" | "error";
 
-type StoreValue = {
+export type StoreValue = {
   state: State;
   propertyLoad: PropertyLoad;
   unmatchedHouse: string;
@@ -51,6 +51,10 @@ type StoreValue = {
 };
 
 const StoreContext = createContext<StoreValue | null>(null);
+
+export function ProvideRenovate({ value, children }: { value: StoreValue; children: ReactNode }) {
+  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
+}
 
 let cachedHandoff: HubHandoff | null = null;
 

@@ -1,6 +1,7 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { copy } from "../copy";
+import { afterHalf } from "../lib/afterView";
 import type { Pill } from "../lib/status";
 import { pillLabel, stepRail } from "../lib/status";
 
@@ -43,7 +44,7 @@ export function Wordmark() {
       <p className="wordmark">
         renovate<span className="dot">.</span>
       </p>
-      <a className="hub" href="https://app.daup.co.za">
+      <a className="hub" href="https://apps.daup.co.za">
         {copy.hub}
       </a>
     </div>
@@ -168,23 +169,51 @@ export function PillView({ pill }: { pill: Pill }) {
   return <span className={`pill ${pill}`}>{pillLabel(pill)}</span>;
 }
 
-export function BeforeAfter({ before, after }: { before: string; after: string }) {
+export function BeforeAfter({
+  before,
+  after,
+  onOpenAfter,
+}: {
+  before: string;
+  after: string;
+  onOpenAfter?: () => void;
+}) {
+  const [split, setSplit] = useState(50);
+  const start = useRef<{ x: number; y: number } | null>(null);
+  const travel = useRef(0);
   return (
-    <div className="slider">
-      <img src={after} alt="After" />
-      <img className="before-shot" src={before} alt="Before" style={{ clipPath: "inset(0 50% 0 0)" }} />
+    <div
+      className="slider"
+      onPointerDown={(event) => {
+        if (event.target instanceof Element && event.target.closest("input")) return;
+        start.current = { x: event.clientX, y: event.clientY };
+        travel.current = 0;
+      }}
+      onPointerMove={(event) => {
+        const origin = start.current;
+        if (!origin) return;
+        travel.current = Math.max(travel.current, Math.hypot(event.clientX - origin.x, event.clientY - origin.y));
+      }}
+      onClick={(event) => {
+        if (!onOpenAfter || travel.current > 10) return;
+        if (event.target instanceof Element && event.target.closest("input")) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        if (afterHalf(event.clientX - rect.left, rect.width, split)) onOpenAfter();
+      }}
+    >
+      <img src={after} alt="After" draggable={false} />
+      <img className="before-shot" src={before} alt="Before" draggable={false} style={{ clipPath: `inset(0 ${100 - split}% 0 0)` }} />
       <span className="slider-label before">Before</span>
       <span className="slider-label after">After</span>
       <input
         type="range"
         min={0}
         max={100}
-        defaultValue={50}
+        value={split}
         aria-label="Before and after"
-        onChange={(event) => {
-          const image = event.currentTarget.parentElement?.querySelector<HTMLImageElement>(".before-shot");
-          if (image) image.style.clipPath = `inset(0 ${100 - Number(event.currentTarget.value)}% 0 0)`;
-        }}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
+        onChange={(event) => setSplit(Number(event.currentTarget.value))}
       />
     </div>
   );

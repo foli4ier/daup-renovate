@@ -1279,6 +1279,50 @@ select:focus-visible {
   }
 }
 
+.after-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: #0f1311;
+  color: #f3efe7;
+  touch-action: none;
+}
+
+.after-viewer-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.after-close {
+  position: absolute;
+  z-index: 1;
+  top: max(10px, env(safe-area-inset-top));
+  left: 12px;
+  min-width: 48px;
+  min-height: 48px;
+}
+
+.after-count {
+  position: absolute;
+  z-index: 1;
+  left: 16px;
+  right: 16px;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: rgba(243, 239, 231, 0.72);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn:hover {
     transform: none;
