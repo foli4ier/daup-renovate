@@ -120,12 +120,26 @@ function isOwnerDocument(value: unknown): value is State {
 export function readStoredOwner(raw: string | null): State | null {
   if (!raw) return null;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!isOwnerDocument(parsed)) return null;
-    return ready(parsed);
+    return readOwnerDocument(JSON.parse(raw) as unknown);
   } catch {
     return null;
   }
+}
+
+/** A stored owner document. Sample sessions and other shapes are ignored. */
+export function readOwnerDocument(value: unknown): State | null {
+  if (!isOwnerDocument(value)) return null;
+  return ready(value);
+}
+
+/** Picture bytes leave the document. Refs stay so the house can store the bytes separately. */
+export function splitPictures(state: State, unresolved: ReadonlySet<string> = new Set()): Prepared {
+  return toDocument(ready(state), unresolved);
+}
+
+/** Turn picture refs back into data URLs. Missing bytes become a placeholder. */
+export function materializePictures(state: State, found: ReadonlyMap<string, string>): OpenedPlan {
+  return materialize(ready(state), found);
 }
 
 export function hasPictureRefs(state: State): boolean {

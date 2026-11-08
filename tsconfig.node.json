@@ -18,6 +18,7 @@
     "vite.config.ts",
     "src/lib/propertyLoad.ts",
     "src/lib/propertyRoute.ts",
+    "src/lib/renovateRoute.ts",
     "src/lib/secrets.ts",
     "src/lib/properties.ts"
   ]

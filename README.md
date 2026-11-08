@@ -47,7 +47,7 @@ Set these when the apps are reachable:
 
 Until a service answers, Push and Send say nothing was sent. Open in Project uses the URL the project service returned.
 
-Plans and photos stay in this browser.
+Plans and photos are saved on the house in DAUP Property and cached in this browser. Opening the same house from Hub on another device shows that plan, including its zones, named plans, pictures, and zone threads. The page calls `/api/renovate/…` on this origin. The Worker forwards that to the Property origin with the house cookie as `Authorization: Bearer`, and does not send the token back to the page. A sample session stays in this browser. If the house cannot be reached, the cached plan stays where it is.
 
 ## Sample drawings
 

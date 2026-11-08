@@ -13,12 +13,14 @@ import Work from "./pages/Work";
 import Zones from "./pages/Zones";
 
 export default function App() {
-  const { state, saveFailed } = useRenovate();
+  const { state, saveFailed, houseSaveFailed } = useRenovate();
   return (
     <div className="shell">
       <div className="brand-strip" aria-hidden="true" />
       {state.sample ? <p className="sample-banner">{copy.sampleBanner}</p> : null}
-      {saveFailed ? <p className="warn save-failed">{copy.saveFailed}</p> : null}
+      {houseSaveFailed || saveFailed ? (
+        <p className="warn save-failed">{houseSaveFailed ? copy.houseSaveFailed : copy.saveFailed}</p>
+      ) : null}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/properties" element={<Properties />} />

@@ -4,8 +4,10 @@ import { ServiceUnreachable } from "../api/errors";
 import { describeAfter } from "../api/describe";
 import { generateImage } from "../api/images";
 import { projectSource } from "../api/project";
+import { browserHouseClient } from "../api/housePlan";
 import { loadProperties, type PropertyQuery } from "../api/property";
 import { freshPhases } from "../data/phases";
+import { copy } from "../copy";
 import { emptyState, SAMPLE_SESSION_KEY, sampleRequested, seed, STORAGE_KEY } from "../data/seed";
 import { captureHubHandoff, type HubHandoff } from "../lib/handoff";
 import { unmatchedHouseName } from "../lib/properties";
@@ -13,7 +15,10 @@ import { locateLeak, type LeakSpot } from "../lib/leak";
 import { assessTotal } from "../lib/budget";
 import { SUGGESTIONS } from "../data/guides";
 import { capReached, type StyleId, type Tier } from "../lib/prompt";
+import { fitPictureForHouse } from "../lib/pictureFit";
 import { canOfferAfterUpload, READ_FALLBACK } from "../lib/reading";
+import { readSyncMarks, SYNC_KEY, syncHousePlans, type SyncMarks, type SyncResult } from "./houseSync";
+import { isEffectivelyEmpty, planFingerprint, sliceProperty } from "./slice";
 import { hasPictureRefs, loadOwner, readStoredOwner, saveOwner } from "./persist";
 import { pictureDb } from "./pictureDb";
 import { reduce, type Action } from "./reducer";
@@ -42,6 +47,7 @@ type StoreValue = {
   pushProject: () => Promise<{ ok: true; url: string } | { ok: false }>;
   sendCallouts: (zoneIds: string[]) => Promise<{ ok: boolean; blocked: boolean; spots: (LeakSpot & { zoneId: string; zoneName: string })[] }>;
   saveFailed: boolean;
+  houseSaveFailed: boolean;
 };
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -81,6 +87,23 @@ function loadSample(): State {
   return seed();
 }
 
+function storedMarks(): SyncMarks {
+  try {
+    if (typeof localStorage === "undefined") return {};
+    return readSyncMarks(localStorage.getItem(SYNC_KEY));
+  } catch {
+    return {};
+  }
+}
+
+function writeMarks(next: SyncMarks) {
+  try {
+    localStorage.setItem(SYNC_KEY, JSON.stringify(next));
+  } catch {
+    /* The house holds the plan. A missed timestamp only delays the next push. */
+  }
+}
+
 function readBoot(): State {
   if (sampleRequested()) return loadSample();
   try {
@@ -103,15 +126,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [unmatchedHouse, setUnmatchedHouse] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [saveFailed, setSaveFailed] = useState(false);
+  const [houseSaveFailed, setHouseSaveFailed] = useState(false);
+  const [bootReady, setBootReady] = useState(sampleRequested());
   const preferApplied = useRef(false);
   const redeemSettled = useRef(false);
   const known = useRef(new Map<string, string>());
   const unresolved = useRef(new Set<string>());
   const saveSeq = useRef(0);
   const saveChain = useRef<Promise<void>>(Promise.resolve());
+  const stamp = useRef(0);
+  const loadGen = useRef(0);
+  const baselineReady = useRef(false);
+  const baseline = useRef(new Map<string, string>());
+  const marks = useRef<SyncMarks>(storedMarks());
+  const houseClient = useRef(browserHouseClient());
   const ref = useRef(state);
   ref.current = state;
   const dispatch = (action: Action) => {
+    stamp.current += 1;
     ref.current = reduce(ref.current, action);
     rawDispatch(action);
   };
@@ -139,12 +171,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, [hydratePictures]);
 
+  function rememberHouse(result: SyncResult) {
+    unresolved.current = result.unresolved;
+    marks.current = result.marks;
+    writeMarks(result.marks);
+    for (const id of result.syncedIds) baseline.current.set(id, planFingerprint(result.state, id));
+    baselineReady.current = true;
+  }
+
   useEffect(() => {
     if (!persistReady) return;
     const seq = ++saveSeq.current;
-    const snapshot = state;
     const job = async () => {
       if (seq !== saveSeq.current) return;
+      const seen = stamp.current;
+      const snapshot = ref.current;
       if (snapshot.sample) {
         if (new URLSearchParams(window.location.search).get("plan") === "none") return;
         try {
@@ -155,9 +196,53 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
         return;
       }
-      const ok = await saveOwner(localStorage, pictureDb(), snapshot, known.current, unresolved.current);
+      const localOk = await saveOwner(localStorage, pictureDb(), snapshot, known.current, unresolved.current);
+      if (seq !== saveSeq.current || stamp.current !== seen) {
+        if (seq === saveSeq.current && !localOk) setSaveFailed(true);
+        return;
+      }
+      if (!baselineReady.current) {
+        setSaveFailed(!localOk);
+        return;
+      }
+      const now = new Date().toISOString();
+      let dirty = false;
+      for (const property of snapshot.properties) {
+        const finger = planFingerprint(snapshot, property.id);
+        if (baseline.current.get(property.id) === finger) continue;
+        if (isEffectivelyEmpty(sliceProperty(snapshot, property.id)) && !marks.current[property.id]?.serverUpdatedAt) continue;
+        const previous = marks.current[property.id] ?? {};
+        marks.current = { ...marks.current, [property.id]: { ...previous, localUpdatedAt: now } };
+        dirty = true;
+      }
+      if (dirty) writeMarks(marks.current);
+      if (!dirty) {
+        if (localOk) setSaveFailed(false);
+        return;
+      }
       if (seq !== saveSeq.current) return;
-      setSaveFailed(!ok);
+      try {
+        const result = await syncHousePlans({
+          state: snapshot,
+          propertyIds: snapshot.properties.map((property) => property.id),
+          marks: marks.current,
+          unresolved: unresolved.current,
+          client: houseClient.current,
+          fit: fitPictureForHouse,
+        });
+        if (seq !== saveSeq.current || stamp.current !== seen) return;
+        rememberHouse(result);
+        if (result.notice === "too-large") {
+          setHouseSaveFailed(true);
+          setSaveFailed(false);
+        } else {
+          setHouseSaveFailed(false);
+          setSaveFailed(!localOk);
+        }
+        if (result.state !== snapshot) dispatchRef.current({ type: "replace", state: result.state });
+      } catch {
+        if (seq === saveSeq.current && !localOk) setSaveFailed(true);
+      }
     };
     const run = saveChain.current.then(job, job);
     saveChain.current = run.then(
@@ -168,11 +253,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!visible || state.sample) return;
+    const gen = ++loadGen.current;
     const handoff = browserHandoff();
     const mock = devMock();
     const sendRedeem = redeemSettled.current ? "" : handoff.houseRedeem;
     const key = `${reloadKey}:${sendRedeem ? "r" : "l"}:${mock || ""}`;
-    let cancel = false;
     setPropertyLoad("loading");
     loadProperties(
       {
@@ -185,33 +270,74 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       key,
     )
       .then((result) => {
-        if (cancel) return;
+        if (gen !== loadGen.current) return;
         const spent = !result.ok && (result.code === "redeem" || result.spent === true);
         if (sendRedeem && (result.ok || spent)) redeemSettled.current = true;
         if (!result.ok) {
           setPropertyLoad("error");
+          setBootReady(true);
           return;
         }
-        const first = !preferApplied.current;
-        preferApplied.current = true;
-        dispatch({
-          type: "hydrate-properties",
-          properties: result.properties,
-          prefer: first
-            ? { houseHint: handoff.houseHint, placeIdHints: handoff.placeIdHints }
-            : undefined,
-        });
-        if (first) setUnmatchedHouse(unmatchedHouseName(result.properties, {
-          houseHint: handoff.houseHint,
-          placeIdHints: handoff.placeIdHints,
-        }));
-        setPropertyLoad("ready");
+        const job = async () => {
+          if (gen !== loadGen.current) return;
+          const first = !preferApplied.current;
+          preferApplied.current = true;
+          dispatchRef.current({
+            type: "hydrate-properties",
+            properties: result.properties,
+            prefer: first
+              ? { houseHint: handoff.houseHint, placeIdHints: handoff.placeIdHints }
+              : undefined,
+          });
+          if (first) {
+            setUnmatchedHouse(unmatchedHouseName(result.properties, {
+              houseHint: handoff.houseHint,
+              placeIdHints: handoff.placeIdHints,
+            }));
+          }
+          const seen = stamp.current;
+          const snapshot = ref.current;
+          try {
+            const synced = await syncHousePlans({
+              state: snapshot,
+              propertyIds: snapshot.properties.map((property) => property.id),
+              marks: marks.current,
+              unresolved: unresolved.current,
+              client: houseClient.current,
+              fit: fitPictureForHouse,
+            });
+            if (gen !== loadGen.current) return;
+            if (stamp.current !== seen) {
+              baselineReady.current = true;
+              setPropertyLoad("ready");
+              setBootReady(true);
+              return;
+            }
+            rememberHouse(synced);
+            if (synced.notice === "too-large") setHouseSaveFailed(true);
+            else setHouseSaveFailed(false);
+            if (synced.state !== snapshot) dispatchRef.current({ type: "replace", state: synced.state });
+          } catch {
+            if (gen !== loadGen.current) return;
+            baselineReady.current = true;
+          }
+          if (gen !== loadGen.current) return;
+          setPropertyLoad("ready");
+          setBootReady(true);
+        };
+        const run = saveChain.current.then(job, job);
+        saveChain.current = run.then(
+          () => undefined,
+          () => undefined,
+        );
       })
       .catch(() => {
-        if (!cancel) setPropertyLoad("error");
+        if (gen !== loadGen.current) return;
+        setPropertyLoad("error");
+        setBootReady(true);
       });
     return () => {
-      cancel = true;
+      loadGen.current += 1;
     };
   }, [visible, reloadKey, state.sample]);
 
@@ -222,6 +348,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       busyZoneId,
       busyMode,
       saveFailed,
+      houseSaveFailed,
       dispatch,
       reloadProperties() {
         setReloadKey((value) => value + 1);
@@ -427,6 +554,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   if (!visible) return null;
+  if (!bootReady) {
+    return (
+      <div className="shell">
+        <div className="brand-strip" aria-hidden="true" />
+        <div className="page">
+          <p>{copy.propertiesLoading}</p>
+        </div>
+      </div>
+    );
+  }
   return <StoreContext.Provider value={api}>{children}</StoreContext.Provider>;
 }
 

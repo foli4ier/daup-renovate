@@ -18,5 +18,5 @@
     "composite": true
   },
   "include": ["src"],
-  "exclude": ["src/lib/propertyLoad.ts", "src/lib/propertyRoute.ts"]
+  "exclude": ["src/lib/propertyLoad.ts", "src/lib/propertyRoute.ts", "src/lib/renovateRoute.ts"]
 }
