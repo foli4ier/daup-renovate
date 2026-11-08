@@ -2,8 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { copy } from "../copy";
 import { AddZoneFields } from "../components/AddZone";
-import { ActionBar, Sheet, Wordmark } from "../components/Chrome";
-import { PillView } from "../components/Chrome";
+import { ActionBar, PillView, Sheet, StepRail, Wordmark } from "../components/Chrome";
 import { makeCustomZone } from "../data/zones";
 import { activePlan, activeProperty, approvedCount, photosFor, propertyZones, zoneListLabel, zonePath, zonePill } from "../state/select";
 import { useRenovate } from "../state/store";
@@ -122,6 +121,7 @@ export default function Zones() {
               {src ? <img src={src} alt="" /> : <div className="ph">No photo</div>}
               <div className="tile-copy">
                 <h3>{zone.name}</h3>
+                <StepRail pill={pill} />
                 <PillView pill={pill} />
                 {pill === "approved" ? <span className="meta">{copy.holdBefore}</span> : null}
               </div>

@@ -2,7 +2,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { copy } from "../copy";
 import type { Pill } from "../lib/status";
-import { pillLabel } from "../lib/status";
+import { pillLabel, stepRail } from "../lib/status";
 
 export function TopBar({
   title,
@@ -38,9 +38,30 @@ export function TopBar({
 export function Wordmark() {
   return (
     <div className="topbar">
-      <span className="logo">DAUP</span>
-      <span className="app-name">Renovate</span>
+      <p className="wordmark">
+        renovate<span className="dot">.</span>
+      </p>
     </div>
+  );
+}
+
+export function StepRail({ pill }: { pill: Pill }) {
+  const steps = stepRail(pill);
+  return (
+    <ol className="step-rail" aria-label="Photos, after, approved">
+      {steps.map((step, index) => (
+        <li key={step.id} className="step-rail-item">
+          {index > 0 ? (
+            <span className={`conn ${steps[index - 1]?.state === "done" ? "done" : ""}`} aria-hidden="true">
+              →
+            </span>
+          ) : null}
+          <span className={`node ${step.state}`} aria-current={step.state === "active" ? "step" : undefined}>
+            {step.label}
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }
 

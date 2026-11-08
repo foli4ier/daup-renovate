@@ -8,7 +8,7 @@ import { assessTotal, linesForZone } from "../src/lib/budget.ts";
 import { findLeak } from "../src/lib/leak.ts";
 import { buildEditPrompt } from "../src/lib/prompt.ts";
 import { buildZoneScope } from "../src/lib/scope.ts";
-import { nextStep, pillOf } from "../src/lib/status.ts";
+import { nextStep, pillOf, stepRail } from "../src/lib/status.ts";
 import { reduce } from "../src/state/reducer.ts";
 import { scopeFor } from "../src/state/select.ts";
 
@@ -273,6 +273,17 @@ describe("zone changes", () => {
     assert.equal(after?.attempts, before?.attempts);
     assert.equal(after?.lastFailed, true);
     assert.equal(pillOf({ skipped: false, questionsPending: false, proposalIds: [], attempts: 0 }, 1), "ready");
+  });
+
+  it("rails Photos, After, and Approved", () => {
+    const states = (pill: Parameters<typeof stepRail>[0]) => stepRail(pill).map((step) => step.state);
+    assert.deepEqual(stepRail("review").map((step) => step.label), ["Photos", "After", "Approved"]);
+    assert.deepEqual(states("needs-photos"), ["active", "future", "future"]);
+    assert.deepEqual(states("ready"), ["done", "active", "future"]);
+    assert.deepEqual(states("questions"), ["done", "active", "future"]);
+    assert.deepEqual(states("review"), ["done", "done", "active"]);
+    assert.deepEqual(states("approved"), ["done", "done", "done"]);
+    assert.deepEqual(states("skipped"), ["quiet", "quiet", "quiet"]);
   });
 });
 

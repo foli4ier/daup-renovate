@@ -114,3 +114,35 @@ export function nextStep(input: {
 export function triesRemaining(attempts: number): number {
   return triesLeft(attempts);
 }
+
+export type RailStep = "done" | "active" | "future" | "quiet";
+
+export type RailNode = {
+  id: "photos" | "after" | "approved";
+  label: string;
+  state: RailStep;
+};
+
+/** Photos → After → Approved. Sage marks done and in progress. Skipped stays quiet. */
+export function stepRail(pill: Pill): RailNode[] {
+  const nodes: Omit<RailNode, "state">[] = [
+    { id: "photos", label: "Photos" },
+    { id: "after", label: "After" },
+    { id: "approved", label: "Approved" },
+  ];
+  if (pill === "skipped") return nodes.map((node) => ({ ...node, state: "quiet" }));
+  const done: Record<RailNode["id"], boolean> = {
+    photos: pill !== "needs-photos",
+    after: pill === "review" || pill === "approved",
+    approved: pill === "approved",
+  };
+  let active = false;
+  return nodes.map((node) => {
+    if (done[node.id]) return { ...node, state: "done" };
+    if (!active) {
+      active = true;
+      return { ...node, state: "active" };
+    }
+    return { ...node, state: "future" };
+  });
+}
