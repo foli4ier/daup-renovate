@@ -14,6 +14,8 @@ import { assessTotal } from "../lib/budget";
 import { SUGGESTIONS } from "../data/guides";
 import { capReached, type StyleId, type Tier } from "../lib/prompt";
 import { canOfferAfterUpload, READ_FALLBACK } from "../lib/reading";
+import { hasPictureRefs, loadOwner, readStoredOwner, saveOwner } from "./persist";
+import { pictureDb } from "./pictureDb";
 import { reduce, type Action } from "./reducer";
 import { activePlan, activeProperty, budgetLines, linkFor, photosFor, proposalsFor, scopeFor, starredPhoto } from "./select";
 import type { CalloutRequest, Photo, State, Zone, ZoneKind } from "./types";
@@ -39,6 +41,7 @@ type StoreValue = {
   generate: (zoneId: string, options?: { drift?: boolean }) => Promise<{ ok: true; proposalId: string } | { ok: false }>;
   pushProject: () => Promise<{ ok: true; url: string } | { ok: false }>;
   sendCallouts: (zoneIds: string[]) => Promise<{ ok: boolean; blocked: boolean; spots: (LeakSpot & { zoneId: string; zoneName: string })[] }>;
+  saveFailed: boolean;
 };
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -61,61 +64,110 @@ function devMock(): PropertyQuery["mock"] {
   return "";
 }
 
-function load(): State {
-  if (typeof window !== "undefined" && sampleRequested()) {
-    if (new URLSearchParams(window.location.search).get("plan") === "none") {
-      const fresh = seed();
-      return { ...fresh, plans: [], links: [], proposals: [], requests: [], activePlanId: null };
-    }
-    try {
-      const raw = sessionStorage.getItem(SAMPLE_SESSION_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as State;
-        if (parsed.version === 2 && parsed.sample) return parsed;
-      }
-    } catch {
-      /* start a fresh sample */
-    }
-    return seed();
+function loadSample(): State {
+  if (new URLSearchParams(window.location.search).get("plan") === "none") {
+    const fresh = seed();
+    return { ...fresh, plans: [], links: [], proposals: [], requests: [], activePlanId: null };
   }
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return emptyState();
-    const parsed = JSON.parse(raw) as State;
-    if (parsed.version !== 2 || parsed.sample || !Array.isArray(parsed.zones) || !Array.isArray(parsed.plans)) return emptyState();
-    return parsed;
+    const raw = sessionStorage.getItem(SAMPLE_SESSION_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as State;
+      if (parsed.version === 2 && parsed.sample) return parsed;
+    }
+  } catch {
+    /* start a fresh sample */
+  }
+  return seed();
+}
+
+function readBoot(): State {
+  if (sampleRequested()) return loadSample();
+  try {
+    return readStoredOwner(localStorage.getItem(STORAGE_KEY)) ?? emptyState();
   } catch {
     return emptyState();
   }
 }
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, rawDispatch] = useReducer(reduce, undefined, load);
+  const boot = useRef<State | null>(null);
+  if (boot.current === null) boot.current = readBoot();
+  const hydratePictures = !boot.current.sample && hasPictureRefs(boot.current);
+  const [visible, setVisible] = useState(!hydratePictures);
+  const [persistReady, setPersistReady] = useState(boot.current.sample);
+  const [state, rawDispatch] = useReducer(reduce, boot.current);
   const [busyZoneId, setBusyZoneId] = useState<string | null>(null);
   const [busyMode, setBusyMode] = useState<"generate" | "read" | null>(null);
   const [propertyLoad, setPropertyLoad] = useState<PropertyLoad>(sampleRequested() ? "ready" : "loading");
   const [unmatchedHouse, setUnmatchedHouse] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [saveFailed, setSaveFailed] = useState(false);
   const preferApplied = useRef(false);
   const redeemSettled = useRef(false);
+  const known = useRef(new Map<string, string>());
+  const unresolved = useRef(new Set<string>());
+  const saveSeq = useRef(0);
+  const saveChain = useRef<Promise<void>>(Promise.resolve());
   const ref = useRef(state);
   ref.current = state;
   const dispatch = (action: Action) => {
     ref.current = reduce(ref.current, action);
     rawDispatch(action);
   };
+  const dispatchRef = useRef(dispatch);
+  dispatchRef.current = dispatch;
 
   useEffect(() => {
-    if (state.sample) {
-      if (new URLSearchParams(window.location.search).get("plan") === "none") return;
-      sessionStorage.setItem(SAMPLE_SESSION_KEY, JSON.stringify(state));
-      return;
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+    if (boot.current?.sample) return;
+    let cancel = false;
+    void loadOwner(localStorage, pictureDb(), known.current)
+      .then((loaded) => {
+        if (cancel) return;
+        unresolved.current = loaded.unresolved;
+        if (hydratePictures) dispatchRef.current({ type: "replace", state: loaded.state });
+        setVisible(true);
+        setPersistReady(true);
+      })
+      .catch(() => {
+        if (cancel) return;
+        setVisible(true);
+        setPersistReady(true);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [hydratePictures]);
 
   useEffect(() => {
-    if (state.sample) return;
+    if (!persistReady) return;
+    const seq = ++saveSeq.current;
+    const snapshot = state;
+    const job = async () => {
+      if (seq !== saveSeq.current) return;
+      if (snapshot.sample) {
+        if (new URLSearchParams(window.location.search).get("plan") === "none") return;
+        try {
+          sessionStorage.setItem(SAMPLE_SESSION_KEY, JSON.stringify(snapshot));
+          if (seq === saveSeq.current) setSaveFailed(false);
+        } catch {
+          if (seq === saveSeq.current) setSaveFailed(true);
+        }
+        return;
+      }
+      const ok = await saveOwner(localStorage, pictureDb(), snapshot, known.current, unresolved.current);
+      if (seq !== saveSeq.current) return;
+      setSaveFailed(!ok);
+    };
+    const run = saveChain.current.then(job, job);
+    saveChain.current = run.then(
+      () => undefined,
+      () => undefined,
+    );
+  }, [persistReady, state]);
+
+  useEffect(() => {
+    if (!visible || state.sample) return;
     const handoff = browserHandoff();
     const mock = devMock();
     const sendRedeem = redeemSettled.current ? "" : handoff.houseRedeem;
@@ -161,7 +213,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => {
       cancel = true;
     };
-  }, [reloadKey, state.sample]);
+  }, [visible, reloadKey, state.sample]);
 
   const api: StoreValue = {
       state,
@@ -169,6 +221,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       unmatchedHouse,
       busyZoneId,
       busyMode,
+      saveFailed,
       dispatch,
       reloadProperties() {
         setReloadKey((value) => value + 1);
@@ -373,6 +426,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       },
   };
 
+  if (!visible) return null;
   return <StoreContext.Provider value={api}>{children}</StoreContext.Provider>;
 }
 

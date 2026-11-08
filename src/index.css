@@ -197,6 +197,10 @@ h3 {
   font-weight: 650;
 }
 
+.save-failed {
+  margin: 12px 18px 0;
+}
+
 /* daup-theme has no amber token. This notice uses chip and forest so it is not the failure colour. */
 .photo-warn {
   background: var(--chip);
