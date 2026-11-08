@@ -40,6 +40,7 @@ export const copy = {
   generateAfter: "Generate an after.",
   sameSpot: "Use a picture from the same spot as your main photo.",
   uploadFailed: "We could not add that picture. Your befores are safe – try again.",
+  saveFailed: "We could not save that on this phone. Your pictures are still here – try again.",
   reading: "Reading the picture…",
   describe: "Describe it yourself.",
   typeAnswer: "Type an answer.",

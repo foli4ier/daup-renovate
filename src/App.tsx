@@ -14,10 +14,11 @@ import You from "./pages/You";
 import Zones from "./pages/Zones";
 
 export default function App() {
-  const { state } = useRenovate();
+  const { state, saveFailed } = useRenovate();
   return (
     <div className="shell">
       {state.sample ? <p className="sample-banner">{copy.sampleBanner}</p> : null}
+      {saveFailed ? <p className="warn save-failed">{copy.saveFailed}</p> : null}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/properties" element={<Properties />} />
