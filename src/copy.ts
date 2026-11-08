@@ -114,6 +114,7 @@ export const copy = {
   addAfter: "Add an after.",
   remove: "Remove.",
   hub: "Hub.",
+  afterCount: (place: number, total: number) => `${place} of ${total}`,
   chat: "Chat.",
   sendMessage: "Send.",
   noLongerApproved: "This zone is no longer approved.",

@@ -27,7 +27,7 @@ export function useZoneSwipe(zoneId: string, enabled = true) {
     if (!enabled) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
-    if (target.closest("button, a, input, textarea, select, label, .photo-row, .backdrop, .sheet")) return;
+    if (target.closest("button, a, input, textarea, select, label, .photo-row, .backdrop, .sheet, .after-viewer")) return;
     origin.current = { x: event.clientX, y: event.clientY };
   }
 

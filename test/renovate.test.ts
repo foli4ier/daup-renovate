@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it } from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { Wordmark } from "../src/components/Chrome.tsx";
 import { copy } from "../src/copy.ts";
 import { seed } from "../src/data/seed.ts";
 import { continuePath, propertyZones, visibleZones, zoneListLabel, zonePath } from "../src/state/select.ts";
@@ -362,6 +367,33 @@ describe("owner copy", () => {
     assert.equal(copy.wereOn("Kitchen"), "You were on Kitchen.");
     assert.equal(copy.sixLimit, "You already have six photos. Remove one to add another.");
     assert.equal(copy.keepBefore, "Keep at least one before — CallOut needs it.");
+  });
+});
+
+function filesUnder(dir: string): string[] {
+  const out: string[] = [];
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) out.push(...filesUnder(path));
+    else out.push(path);
+  }
+  return out;
+}
+
+describe("Hub.", () => {
+  it("sits on the wordmark and opens https://apps.daup.co.za", () => {
+    const html = renderToStaticMarkup(createElement(Wordmark));
+    assert.match(html, /class="topbar wordmark-row"/);
+    assert.match(html, /class="hub" href="https:\/\/apps\.daup\.co\.za"/);
+    assert.match(html, /Hub\./);
+    assert.equal(html.includes("https://app.daup.co.za"), false);
+    assert.equal(copy.hub, "Hub.");
+    const root = new URL("..", import.meta.url);
+    const files = [join(root.pathname, "README.md"), ...filesUnder(join(root.pathname, "src"))];
+    for (const file of files) {
+      const text = readFileSync(file, "utf8").replaceAll("apps.daup.co.za", "");
+      assert.equal(text.includes("app.daup.co.za"), false, file);
+    }
   });
 });
 
