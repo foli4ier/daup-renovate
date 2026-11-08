@@ -162,7 +162,7 @@ export default function Capture() {
   const left = triesLeft(currentLink.attempts);
 
   return (
-    <div className="page" {...picker.swipe}>
+    <div className={`page${hasBefore ? " has-capture" : ""}`} {...picker.swipe}>
       <TopBar
         title={zone.name}
         onTitle={() => picker.setOpen(true)}
@@ -403,7 +403,7 @@ export default function Capture() {
       {used ? <p className="meta">{used}</p> : null}
 
       {hasBefore ? (
-        <div className="thumb-paths">
+        <div className="action-bar capture-actions">
           <button className="btn btn-outline btn-wide" type="button" disabled={reading} onClick={() => afterRef.current?.click()}>
             {reading ? copy.reading : copy.uploadAfter}
           </button>
