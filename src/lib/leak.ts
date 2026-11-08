@@ -21,7 +21,10 @@ const BUDGET_WORDS = [
   "costing",
 ];
 
-/** Scan contractor-facing text. The owner banner is not part of this text. */
+/**
+ * Scan text another person could later see, including a zone thread.
+ * The owner banner is not part of this text.
+ */
 export function findLeak(text: string): Leak | null {
   if (/\bR\s*\d/i.test(text)) return "amount";
   if (/\$\s?\d/.test(text)) return "amount";
@@ -62,6 +65,11 @@ export function locateLeak(parts: {
 export function leakPhrase(spot: LeakSpot): string {
   const what = spot.leak === "amount" ? "an amount" : spot.leak === "range" ? "a range" : "a budget word";
   return `There’s ${what} in ${spot.field}.`;
+}
+
+/** Same leak rules as a CallOut request. A thread must stay free of prices. */
+export function threadLeak(text: string): Leak | null {
+  return findLeak(text);
 }
 
 export function assertClean(text: string): void {

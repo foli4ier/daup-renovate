@@ -3,9 +3,9 @@ import { describe, it } from "node:test";
 import { copy } from "../src/copy.ts";
 import { seed } from "../src/data/seed.ts";
 import { continuePath, propertyZones, visibleZones, zoneListLabel, zonePath } from "../src/state/select.ts";
-import { answersForSkip, needsQuestions } from "../src/data/questions.ts";
+import { answersForSkip, needsQuestions, questionsFor } from "../src/data/questions.ts";
 import { assessTotal, linesForZone } from "../src/lib/budget.ts";
-import { findLeak } from "../src/lib/leak.ts";
+import { findLeak, threadLeak } from "../src/lib/leak.ts";
 import { buildEditPrompt } from "../src/lib/prompt.ts";
 import { buildZoneScope } from "../src/lib/scope.ts";
 import { nextStep, pillOf, stepRail } from "../src/lib/status.ts";
@@ -118,6 +118,15 @@ describe("questions", () => {
     assert.equal(needsQuestions("front", []), true);
     assert.equal(needsQuestions("kitchen", [{ questionId: "use", text: "Home kitchen." }]), false);
     assert.equal(needsQuestions("kitchen", []), true);
+  });
+
+  it("keeps question prompts free of prices", () => {
+    for (const key of ["living", "kitchen", "front", "bath", "back", "side", "sun", "bed1", "custom"]) {
+      for (const question of questionsFor(key)) {
+        assert.equal(threadLeak(question.prompt), null, question.prompt);
+        for (const option of question.options) assert.equal(threadLeak(option), null, option);
+      }
+    }
   });
 });
 
@@ -305,6 +314,12 @@ describe("owner copy", () => {
     copy.done,
     copy.back,
     copy.tryAgain,
+    copy.edit,
+    copy.addAfter,
+    copy.remove,
+    copy.hub,
+    copy.chat,
+    copy.sendMessage,
     copy.addPhotos,
     copy.addZone,
     copy.seeAfters,
@@ -338,9 +353,94 @@ describe("owner copy", () => {
     assert.equal(copy.seeAfters, "See afters.");
     assert.equal(copy.seeBudget, "See budget.");
     assert.equal(copy.tryAgain, "Try again.");
+    assert.equal(copy.edit, "Edit.");
+    assert.equal(copy.addAfter, "Add an after.");
+    assert.equal(copy.hub, "Hub.");
+    assert.equal(copy.chat, "Chat.");
+    assert.equal(copy.sendMessage, "Send.");
     assert.equal(copy.approved, "Approved.");
     assert.equal(copy.wereOn("Kitchen"), "You were on Kitchen.");
     assert.equal(copy.sixLimit, "You already have six photos. Remove one to add another.");
     assert.equal(copy.keepBefore, "Keep at least one before — CallOut needs it.");
+  });
+});
+
+describe("zone thread", () => {
+  it("asks the zone questions as messages and keeps a saved answer", () => {
+    const seeded = reduce(seed(), {
+      type: "seed-thread",
+      zoneId: "zone_sun",
+      ownerId: "owner_you",
+      now: "2026-11-08T06:05:00.000Z",
+    });
+    const sun = seeded.messages.filter((message) => message.zoneId === "zone_sun");
+    assert.equal(sun[0]?.text, "What should the floor become?");
+    assert.deepEqual(sun[0]?.chips, ["Vinyl plank.", "Keep the carpet.", "Not sure."]);
+    assert.equal(sun[1]?.text, "Keep the wooden frames?");
+    const again = reduce(seeded, {
+      type: "seed-thread",
+      zoneId: "zone_sun",
+      ownerId: "owner_you",
+      now: "2026-11-08T06:06:00.000Z",
+    });
+    assert.equal(again, seeded);
+
+    const kitchen = reduce(seed(), {
+      type: "seed-thread",
+      zoneId: "zone_kitchen",
+      ownerId: "owner_you",
+      now: "2026-11-08T06:05:00.000Z",
+    }).messages.filter((message) => message.zoneId === "zone_kitchen");
+    assert.equal(kitchen[0]?.questionId, "use");
+    assert.equal(kitchen[1]?.text, "Home kitchen.");
+    assert.equal(kitchen[1]?.authorId, "owner_you");
+    assert.equal(kitchen[2]?.questionId, "tiles");
+  });
+
+  it("refuses a price in the thread and does not save it as an answer", () => {
+    const seeded = reduce(seed(), {
+      type: "seed-thread",
+      zoneId: "zone_sun",
+      ownerId: "owner_you",
+      now: "2026-11-08T06:05:00.000Z",
+    });
+    const blocked = reduce(seeded, {
+      type: "post-message",
+      id: "msg_leak",
+      zoneId: "zone_sun",
+      authorId: "owner_you",
+      text: "About R250 for the floor",
+      createdAt: "2026-11-08T06:06:00.000Z",
+      questionId: "floor",
+    });
+    assert.equal(blocked, seeded);
+    assert.equal(findLeak("a tight budget"), "budget-word");
+    const posted = reduce(seeded, {
+      type: "post-message",
+      id: "msg_floor",
+      zoneId: "zone_sun",
+      authorId: "owner_you",
+      text: "Vinyl plank.",
+      createdAt: "2026-11-08T06:06:00.000Z",
+      questionId: "floor",
+    });
+    const sun = posted.zones.find((zone) => zone.id === "zone_sun");
+    assert.equal(sun?.answers.find((answer) => answer.questionId === "floor")?.text, "Vinyl plank.");
+    const reply = posted.messages.find((message) => message.id === "msg_floor");
+    assert.equal(reply?.authorId, "owner_you");
+    assert.equal(reply?.text, "Vinyl plank.");
+  });
+});
+
+describe("remove an after", () => {
+  it("gives back a generated try and clears approval", () => {
+    let state = reduce(seed(), { type: "approve", planId: "plan_refresh", zoneId: "zone_front", proposalId: "prop_front" });
+    state = reduce(state, { type: "remove-proposal", planId: "plan_refresh", zoneId: "zone_front", proposalId: "prop_front" });
+    const link = state.links.find((item) => item.zoneId === "zone_front");
+    assert.equal(link?.attempts, 0);
+    assert.equal(link?.approvedProposalId, undefined);
+    assert.equal(link?.proposalIds.includes("prop_front"), false);
+    assert.equal(state.proposals.some((item) => item.id === "prop_front"), false);
+    assert.equal(state.photos.some((item) => item.id === "photo_front"), true);
   });
 });

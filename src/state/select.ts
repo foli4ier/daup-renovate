@@ -146,7 +146,7 @@ export function phaseRows(state: State, plan: Plan) {
 
 export function stepHref(step: NextStep): string | null {
   if (step.kind === "zone" && step.zoneId && step.dest === "capture") return `/zone/${step.zoneId}`;
-  if (step.kind === "zone" && step.zoneId && step.dest === "questions") return `/zone/${step.zoneId}/questions`;
+  if (step.kind === "zone" && step.zoneId && step.dest === "chat") return `/zone/${step.zoneId}/chat?from=capture`;
   if (step.kind === "zone" && step.zoneId && step.dest === "gallery") return `/gallery/${step.zoneId}`;
   if (step.kind === "budget") return "/budget";
   if (step.kind === "callout") return "/callout";

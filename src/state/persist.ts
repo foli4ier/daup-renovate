@@ -1,5 +1,5 @@
 import { emptyState, STORAGE_KEY } from "../data/seed";
-import type { State } from "./types";
+import { withMessages, type State } from "./types";
 
 /**
  * Picture bytes live in IndexedDB. The plan document keeps this prefix
@@ -102,12 +102,12 @@ function writeSlots(state: State, values: Map<string, string>): State {
 }
 
 function ready(state: State): State {
-  return {
+  return withMessages({
     ...state,
     photos: Array.isArray(state.photos) ? state.photos : [],
     proposals: Array.isArray(state.proposals) ? state.proposals : [],
     requests: Array.isArray(state.requests) ? state.requests : [],
-  };
+  });
 }
 
 function isOwnerDocument(value: unknown): value is State {

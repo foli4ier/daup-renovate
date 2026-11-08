@@ -82,8 +82,26 @@ describe("uploaded after", () => {
     assert.equal(after?.attempts, before.attempts);
     assert.equal(triesLeft(after?.attempts ?? 0), triesLeft(before.attempts));
     assert.ok(after?.proposalIds.includes("up_front"));
-    assert.equal(galleryRetryLabel(after?.attempts ?? 0, true), copy.tryAgain);
-    assert.equal(galleryRetryLabel(0, true), copy.generateAfter);
+    assert.equal(galleryRetryLabel(after?.attempts ?? 0, true), copy.edit);
+    assert.equal(galleryRetryLabel(0, true), copy.edit);
+    assert.equal(copy.edit, "Edit.");
+  });
+
+  it("removes an uploaded after without giving back or spending a try", () => {
+    const state = seed();
+    const withUpload = reduce(state, {
+      type: "upload-ok",
+      proposal: upload("zone_front", "up_front"),
+      description: READ,
+      keep: [],
+      replace: [],
+    });
+    const attempts = withUpload.links.find((link) => link.zoneId === "zone_front")?.attempts;
+    const removed = reduce(withUpload, { type: "remove-proposal", planId: PLAN, zoneId: "zone_front", proposalId: "up_front" });
+    const link = removed.links.find((item) => item.zoneId === "zone_front");
+    assert.equal(link?.attempts, attempts);
+    assert.equal(removed.proposals.some((item) => item.id === "up_front"), false);
+    assert.equal(removed.proposals.some((item) => item.id === "prop_front"), true);
   });
 
   it("can be approved without a generated picture", () => {

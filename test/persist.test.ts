@@ -350,4 +350,13 @@ describe("picture persistence", () => {
     assert.equal(bytes.saved.has("photo:photo_back"), false);
     assert.equal(bytes.saved.get("photo:photo_front"), dataUrl(FRONT_BEFORE));
   });
+
+  it("opens a v2 plan that has no thread yet", async () => {
+    const state = planWithPictures();
+    const legacy = { ...state, messages: undefined };
+    const bucket = memoryBucket(JSON.stringify(legacy));
+    const loaded = await loadOwner(bucket, memoryBytes(), new Map());
+    assert.deepEqual(loaded.state.messages, []);
+    assert.equal(loaded.state.photos.find((item) => item.id === "photo_front")?.url, dataUrl(FRONT_BEFORE));
+  });
 });

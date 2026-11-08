@@ -9,15 +9,17 @@ export function TopBar({
   onTitle,
   titleOpen,
   extra,
+  onBack,
 }: {
   title?: string;
   onTitle?: () => void;
   titleOpen?: boolean;
   extra?: ReactNode;
+  onBack?: () => void;
 }) {
   return (
     <div className="topbar">
-      <button className="back" type="button" onClick={() => history.back()}>
+      <button className="back" type="button" onClick={() => (onBack ? onBack() : history.back())}>
         {copy.back}
       </button>
       {title && onTitle ? (
@@ -37,10 +39,13 @@ export function TopBar({
 
 export function Wordmark() {
   return (
-    <div className="topbar">
+    <div className="topbar wordmark-row">
       <p className="wordmark">
         renovate<span className="dot">.</span>
       </p>
+      <a className="hub" href="https://app.daup.co.za">
+        {copy.hub}
+      </a>
     </div>
   );
 }
@@ -67,11 +72,11 @@ export function StepRail({ pill }: { pill: Pill }) {
 
 export function TabBar() {
   const path = useLocation().pathname;
-  const current = path.startsWith("/you") ? "you" : path === "/" || path.startsWith("/properties") ? "home" : "plan";
+  const current = path === "/" || path.startsWith("/properties") ? "home" : path === "/budget" ? "budget" : "zones";
   const tabs = [
     { id: "home", href: "/", label: "Home" },
-    { id: "plan", href: "/plan", label: "Plan" },
-    { id: "you", href: "/you", label: "You" },
+    { id: "zones", href: "/plan", label: "Zones" },
+    { id: "budget", href: "/budget", label: "Budget" },
   ] as const;
   return (
     <nav className="tabs" aria-label="App">

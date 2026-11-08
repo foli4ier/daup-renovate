@@ -109,6 +109,14 @@ export const copy = {
   zonesStay: "Zones stay on the property. The next plan reuses the photos.",
   placeholderName: "Kitchen or Kombuis",
   tryAgain: "Try again.",
+  edit: "Edit.",
+  addAfter: "Add an after.",
+  remove: "Remove.",
+  hub: "Hub.",
+  chat: "Chat.",
+  sendMessage: "Send.",
+  noLongerApproved: "This zone is no longer approved.",
+  messagePlaceholder: "Write a message.",
   triesLeft: (left: number) => `(${left} left)`,
   addPhotosTo: (name: string) => `Add photos to ${name}.`,
   review: (name: string) => `Review ${name}.`,
@@ -128,7 +136,8 @@ export const copy = {
   mergeAsk: (source: string, target: string) => `Merge ${source} into ${target}?`,
 };
 
+/** Gallery slot is always Edit. An upload does not swap in Generate an after. */
 export function galleryRetryLabel(attempts: number, hasUpload: boolean): string {
-  if (hasUpload && attempts === 0) return copy.generateAfter;
-  return copy.tryAgain;
+  if (hasUpload && attempts === 0) return copy.edit;
+  return copy.edit;
 }
