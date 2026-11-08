@@ -2,10 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { copy } from "../copy";
 import { OpenProperty, PropertyCards } from "../components/PropertyStatus";
-import { Wordmark } from "../components/Chrome";
-import { Sheet } from "../components/Chrome";
+import { Sheet, StepRail, Wordmark } from "../components/Chrome";
 import { statusLabel } from "../lib/status";
-import { activePlan, activeProperty, approvedCount, continuePath, coverUrl } from "../state/select";
+import { activePlan, activeProperty, approvedCount, continuePath, coverUrl, zonePill } from "../state/select";
 import { useRenovate } from "../state/store";
 
 export default function Home() {
@@ -84,6 +83,7 @@ export default function Home() {
             <span style={{ width: `${counts.total ? (counts.approved / counts.total) * 100 : 0}%` }} />
           </div>
           {lastZone ? <p>{copy.wereOn(lastZone.name)}</p> : null}
+          <StepRail pill={lastZone ? zonePill(state, plan.id, lastZone) : "needs-photos"} />
           <button className="btn btn-primary btn-wide" type="button" onClick={() => navigate(continuePath(state))} style={{ marginTop: 8 }}>
             {copy.continue}
           </button>

@@ -17,6 +17,7 @@ export default function App() {
   const { state, saveFailed } = useRenovate();
   return (
     <div className="shell">
+      <div className="brand-strip" aria-hidden="true" />
       {state.sample ? <p className="sample-banner">{copy.sampleBanner}</p> : null}
       {saveFailed ? <p className="warn save-failed">{copy.saveFailed}</p> : null}
       <Routes>

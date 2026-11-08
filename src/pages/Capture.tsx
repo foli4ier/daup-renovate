@@ -180,7 +180,8 @@ export default function Capture() {
           ) : null
         }
       />
-      <div className="photo-row">
+      <div className="photo-stage">
+        <div className="photo-row">
         {photos.map((photo) => (
           <div key={photo.id} className={photo.starred ? "thumb starred" : "thumb"}>
             <img src={photo.url} alt="" />
@@ -209,6 +210,7 @@ export default function Capture() {
             </button>
           </div>
         ))}
+        </div>
       </div>
       {photos.some((photo) => photo.starred) ? <p className="meta">{copy.mainPhoto}</p> : null}
       {keepNote ? <p className="meta">{copy.keepBefore}</p> : null}
@@ -237,7 +239,7 @@ export default function Capture() {
       <p style={{ marginTop: 16 }}>{copy.tip}</p>
       <p className="meta">{copy.people}</p>
 
-      <h2 style={{ marginTop: 22 }}>Style</h2>
+      <h2 className="eyebrow" style={{ marginTop: 22 }}>Style</h2>
       <div className="chips" style={{ marginTop: 8 }}>
         {showFrom ? (
           <button
@@ -282,7 +284,7 @@ export default function Capture() {
       </div>
       {style === "from-after" ? (
         <label className="field">
-          {copy.whatWeRead}
+          <span className="eyebrow">{copy.whatWeRead}</span>
           <textarea
             className="read-line"
             rows={3}
@@ -310,7 +312,7 @@ export default function Capture() {
         </label>
       ) : null}
 
-      <h2 style={{ marginTop: 18 }}>Budget</h2>
+      <h2 className="eyebrow" style={{ marginTop: 18 }}>Budget</h2>
       <div className="tier-row" style={{ marginTop: 8 }}>
         {TIER_CHIPS.map((chip) => (
           <button
@@ -329,7 +331,7 @@ export default function Capture() {
         ))}
       </div>
 
-      <h2 style={{ marginTop: 18 }}>Keep</h2>
+      <h2 className="eyebrow" style={{ marginTop: 18 }}>Keep</h2>
       <p className="meta">{copy.keepOptional}</p>
       <div className="chips" style={{ marginTop: 8 }}>
         {[...new Set([...suggestions.keep, ...keep])].map((item) => (
@@ -356,7 +358,7 @@ export default function Capture() {
         </button>
       </form>
 
-      <h2 style={{ marginTop: 18 }}>Replace</h2>
+      <h2 className="eyebrow" style={{ marginTop: 18 }}>Replace</h2>
       <p className="meta">{copy.replaceOptional}</p>
       <div className="chips" style={{ marginTop: 8 }}>
         {[...new Set([...suggestions.replace, ...replace])].map((item) => (

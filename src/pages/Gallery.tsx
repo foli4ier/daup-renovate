@@ -75,13 +75,15 @@ export default function Gallery() {
   return (
     <div className={`page ${driftOpen ? "" : "has-skip"}`} {...picker.swipe}>
       <TopBar title={zone?.name} onTitle={zone ? () => picker.setOpen(true) : undefined} titleOpen={picker.open} />
-      {current && before ? (
-        <BeforeAfter before={before.url} after={current.imageUrl} />
-      ) : link?.lastFailed ? (
-        <p className="warn">{copy.failure}</p>
-      ) : (
-        <div className="ph">No picture yet</div>
-      )}
+      <div className="photo-stage">
+        {current && before ? (
+          <BeforeAfter before={before.url} after={current.imageUrl} />
+        ) : link?.lastFailed ? (
+          <p className="warn">{copy.failure}</p>
+        ) : (
+          <div className="ph">No picture yet</div>
+        )}
+      </div>
       {smallAfter ? (
         <p className="photo-warn" style={{ marginTop: 10 }}>
           {smallAfter}
@@ -90,7 +92,7 @@ export default function Gallery() {
       {hasUpload && zone && link ? (
         <>
           <label className="field" htmlFor="what-we-read">
-            {copy.whatWeRead}
+            <span className="eyebrow">{copy.whatWeRead}</span>
             <textarea
               id="what-we-read"
               className="read-line"
@@ -124,7 +126,7 @@ export default function Gallery() {
       ) : null}
       {changes.length ? (
         <>
-          <h2 id="what-changes" style={{ marginTop: 16 }}>{copy.whatChanges}</h2>
+          <h2 className="eyebrow" id="what-changes" style={{ marginTop: 16 }}>{copy.whatChanges}</h2>
           <ul className="changes">
             {changes.map((item, index) => (
               <li key={`${index}-${item}`}>{item}</li>
