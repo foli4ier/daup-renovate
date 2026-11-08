@@ -95,8 +95,12 @@ function readBearer(body: Record<string, unknown>): string {
   return "";
 }
 
-function tainted(body: Record<string, unknown>): boolean {
+export function hasForbiddenKey(body: Record<string, unknown>): boolean {
   return Object.keys(body).some((key) => FORBIDDEN.has(key.toLowerCase()));
+}
+
+function tainted(body: Record<string, unknown>): boolean {
+  return hasForbiddenKey(body);
 }
 
 async function redeemHouse(origin: string, houseRedeem: string, fetchImpl: FetchLike): Promise<string | null> {

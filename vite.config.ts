@@ -3,6 +3,7 @@ import { defineConfig, type Connect, type Plugin } from "vite";
 import { DEFAULT_SEED_ORIGIN } from "./src/lib/propertyLoad";
 import { PROPERTY_LIST_URL } from "./src/lib/properties";
 import { handlePropertyPost } from "./src/lib/propertyRoute";
+import { handleRenovateRequest } from "./src/lib/renovateRoute";
 
 type BodyRequest = {
   url?: string;
@@ -12,7 +13,7 @@ type BodyRequest = {
   on(event: "error", listener: (error: unknown) => void): void;
 };
 
-function readBody(req: BodyRequest): Promise<string> {
+function readRaw(req: BodyRequest): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     const chunks: Uint8Array[] = [];
     req.on("data", (chunk) => chunks.push(chunk));
@@ -24,10 +25,14 @@ function readBody(req: BodyRequest): Promise<string> {
         merged.set(chunk, offset);
         offset += chunk.byteLength;
       }
-      resolve(new TextDecoder().decode(merged));
+      resolve(merged);
     });
     req.on("error", reject);
   });
+}
+
+function readBody(req: BodyRequest): Promise<string> {
+  return readRaw(req).then((bytes) => new TextDecoder().decode(bytes));
 }
 
 function send(res: { statusCode: number; setHeader(name: string, value: string): void; end(body: string): void }, status: number, body: unknown) {
@@ -47,6 +52,39 @@ function attach(server: { middlewares: Connect.Server }, allowMock: boolean) {
     const url = req.url ?? "";
     if (!url.startsWith("/api/")) {
       next();
+      return;
+    }
+    if (url.startsWith("/api/renovate/")) {
+      try {
+        const method = req.method ?? "GET";
+        const headers = new Headers();
+        const cookie = header(req, "cookie");
+        const contentType = header(req, "content-type");
+        const accept = header(req, "accept");
+        if (cookie) headers.set("cookie", cookie);
+        if (contentType) headers.set("content-type", contentType);
+        if (accept) headers.set("accept", accept);
+        const hasBody = method !== "GET" && method !== "HEAD";
+        const raw = hasBody ? await readRaw(req) : undefined;
+        const request = new Request(`http://localhost${url}`, {
+          method,
+          headers,
+          body: raw ? new Blob([raw]) : undefined,
+        });
+        const response = await handleRenovateRequest(request, {
+          cookie,
+          propertyUrl: process.env.PROPERTY_URL || process.env.VITE_PROPERTY_URL || PROPERTY_LIST_URL,
+        });
+        res.statusCode = response.status;
+        response.headers.forEach((value, key) => {
+          if (key.toLowerCase() === "set-cookie") return;
+          res.setHeader(key, value);
+        });
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        res.end(Buffer.from(bytes));
+      } catch {
+        send(res, 502, { error: "unreachable" });
+      }
       return;
     }
     if (url.startsWith("/api/properties") && req.method === "POST") {

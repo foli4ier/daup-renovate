@@ -1,6 +1,7 @@
 import { DEFAULT_SEED_ORIGIN } from "../src/lib/propertyLoad";
 import { PROPERTY_LIST_URL } from "../src/lib/properties";
 import { handlePropertyPost } from "../src/lib/propertyRoute";
+import { handleRenovateRequest } from "../src/lib/renovateRoute";
 import { describePrompt, parseReading } from "../src/lib/reading";
 import { buildEditPrompt, capReached, MODEL_KLEIN, MODEL_VISION, withStyleReference, type PromptInput } from "../src/lib/prompt";
 
@@ -228,6 +229,12 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/api/health") return json({ ok: true });
     if (url.pathname === "/api/properties" && request.method === "POST") return properties(request, env);
+    if (url.pathname.startsWith("/api/renovate/")) {
+      return handleRenovateRequest(request, {
+        cookie: request.headers.get("cookie"),
+        propertyUrl: env.PROPERTY_URL || PROPERTY_LIST_URL,
+      });
+    }
     if (url.pathname === "/api/generate" && request.method === "POST") return generate(request, env);
     if (url.pathname === "/api/describe" && request.method === "POST") return describe(request, env);
     return env.ASSETS.fetch(request);
