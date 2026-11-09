@@ -7,8 +7,46 @@ import { ActionBar, Sheet, TopBar } from "../components/Chrome";
 import { useZonePicker } from "../components/ZoneNav";
 import { whatChanges } from "../lib/changes";
 import { ABOUT_ONE_MEGAPIXEL, triesLeft } from "../lib/prompt";
-import { activePlan, linkFor, photosFor, proposalsFor, starredPhoto } from "../state/select";
+import { nextReaction, reactionLines } from "../lib/spend";
+import { activePlan, activeProperty, linkFor, photosFor, proposalsFor, starredPhoto } from "../state/select";
 import { useRenovate } from "../state/store";
+import type { ReactionKind } from "../state/types";
+
+function AfterReactions({ planId, zoneId, proposalId }: { planId: string; zoneId: string; proposalId: string }) {
+  const { state, dispatch } = useRenovate();
+  const viewerId = activeProperty(state)?.ownerId ?? "";
+  const proposal = state.proposals.find((item) => item.id === proposalId && item.planId === planId && item.zoneId === zoneId);
+  const lines = reactionLines(proposal?.reactions, viewerId);
+  const mine = proposal?.reactions?.find((item) => item.personId === viewerId);
+
+  function tap(kind: ReactionKind) {
+    if (!viewerId || !proposal) return;
+    dispatch({
+      type: "set-reaction",
+      planId,
+      zoneId,
+      proposalId: proposal.id,
+      personId: viewerId,
+      name: mine?.name ?? "",
+      kind: nextReaction(mine?.kind, kind),
+    });
+  }
+
+  return (
+    <div className="after-reactions">
+      <div className="reaction-row">
+        <button className="btn btn-outline" type="button" aria-pressed={mine?.kind === "like"} onClick={() => tap("like")}>
+          {copy.like}
+        </button>
+        <button className="btn btn-outline" type="button" aria-pressed={mine?.kind === "dislike"} onClick={() => tap("dislike")}>
+          {copy.dislike}
+        </button>
+      </div>
+      {lines.liked ? <p className="reaction-names">{lines.liked}</p> : null}
+      {lines.disliked ? <p className="reaction-names">{lines.disliked}</p> : null}
+    </div>
+  );
+}
 
 export default function Gallery() {
   const { zoneId = "" } = useParams();
@@ -18,6 +56,7 @@ export default function Gallery() {
   const plan = activePlan(state);
   const picker = useZonePicker(zoneId);
   const [picked, setPicked] = useState<string | null>(null);
+  const [pickedBefore, setPickedBefore] = useState<string | null>(null);
   const [driftOpen, setDriftOpen] = useState(false);
   const [keepDraft, setKeepDraft] = useState("");
   const [unapproved, setUnapproved] = useState(false);
@@ -42,9 +81,9 @@ export default function Gallery() {
     pictures.find((item) => item.id === requested) ??
     approvedPicture ??
     pictures[pictures.length - 1];
-  const before =
-    (current ? state.photos.find((photo) => photo.id === current.beforePhotoId) : undefined) ??
-    starredPhoto(photosFor(state, zone?.id ?? ""));
+  const photos = zone ? photosFor(state, zone.id) : [];
+  const beforeFromAfter = current ? photos.find((photo) => photo.id === current.beforePhotoId) : undefined;
+  const shownBefore = photos.find((photo) => photo.id === pickedBefore) ?? beforeFromAfter ?? starredPhoto(photos);
   const left = triesLeft(link?.attempts ?? 0);
   const hasUpload = pictures.some((item) => item.source === "uploaded");
   const showingUploaded = current?.source === "uploaded";
@@ -101,11 +140,14 @@ export default function Gallery() {
         }
       />
       <GalleryStage
-        beforeUrl={before?.url}
+        befores={photos.map((photo) => ({ id: photo.id, imageUrl: photo.url }))}
+        beforeId={shownBefore?.id}
+        onSelectBefore={setPickedBefore}
         pictures={pictures}
         selectedId={current?.id}
         onSelect={setPicked}
         empty={link?.lastFailed ? <p className="warn">{copy.failure}</p> : <div className="ph">No picture yet</div>}
+        afterFooter={zone && current ? <AfterReactions planId={currentPlan.id} zoneId={zone.id} proposalId={current.id} /> : null}
       />
       {smallAfter ? (
         <p className="photo-warn" style={{ marginTop: 10 }}>

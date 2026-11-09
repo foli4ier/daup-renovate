@@ -136,6 +136,20 @@ export const copy = {
   aboutDays: (days: number) => `About ${days} ${days === 1 ? "day" : "days"}.`,
   startsAfter: (names: string[]) => (names.length ? `Starts after ${names.join(" and ")}.` : "Starts first."),
   mergeAsk: (source: string, target: string) => `Merge ${source} into ${target}?`,
+  availableToSpend: "Available to spend",
+  addAmount: "Add an amount.",
+  estimateOver: "The estimate is over what you can spend.",
+  highEstimateOver: "The high estimate goes past what you can spend.",
+  addPhase: "Add a phase.",
+  addThisPhase: "Add this phase.",
+  phasesOver: "These phases add up to more than you can spend.",
+  addSpendOnBudget: "Add what you can spend on Budget.",
+  addSizeForTotal: "Add a size on Budget for a total.",
+  like: "Like.",
+  dislike: "Dislike.",
+  likedBy: (names: string) => `Liked by ${names}.`,
+  dislikedBy: (names: string) => `Disliked by ${names}.`,
+  phaseName: "Phase name",
 };
 
 /** Gallery slot is always Edit. An upload does not swap in Generate an after. */

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { copy } from "../copy";
-import { afterHalf } from "../lib/afterView";
+import { afterHalf, beforeHalf } from "../lib/afterView";
 import type { Pill } from "../lib/status";
 import { pillLabel, stepRail } from "../lib/status";
 
@@ -98,11 +98,13 @@ const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabi
 
 export function Sheet({
   title,
+  heading,
   onClose,
   children,
   footer,
 }: {
   title: string;
+  heading?: ReactNode;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
@@ -157,7 +159,7 @@ export function Sheet({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="grip" />
-        <h2 className="sheet-title">{title}</h2>
+        <h2 className="sheet-title">{heading ?? title}</h2>
         <div className="sheet-scroll">{children}</div>
         {footer ? <div className="sheet-foot">{footer}</div> : null}
       </div>
@@ -173,10 +175,12 @@ export function BeforeAfter({
   before,
   after,
   onOpenAfter,
+  onOpenBefore,
 }: {
   before: string;
   after: string;
   onOpenAfter?: () => void;
+  onOpenBefore?: () => void;
 }) {
   const [split, setSplit] = useState(50);
   const start = useRef<{ x: number; y: number } | null>(null);
@@ -195,10 +199,15 @@ export function BeforeAfter({
         travel.current = Math.max(travel.current, Math.hypot(event.clientX - origin.x, event.clientY - origin.y));
       }}
       onClick={(event) => {
-        if (!onOpenAfter || travel.current > 10) return;
+        if (travel.current > 10) return;
         if (event.target instanceof Element && event.target.closest("input")) return;
         const rect = event.currentTarget.getBoundingClientRect();
-        if (afterHalf(event.clientX - rect.left, rect.width, split)) onOpenAfter();
+        const x = event.clientX - rect.left;
+        if (onOpenAfter && afterHalf(x, rect.width, split)) {
+          onOpenAfter();
+          return;
+        }
+        if (onOpenBefore && beforeHalf(x, rect.width, split)) onOpenBefore();
       }}
     >
       <img src={after} alt="After" draggable={false} />

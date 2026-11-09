@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 import { copy } from "../src/copy.ts";
-import { afterHalf, pointerGesture, stepIndex } from "../src/lib/afterView.ts";
+import { afterHalf, beforeHalf, pointerGesture, stepIndex } from "../src/lib/afterView.ts";
 
 describe("after viewer", () => {
   it("treats only the open side of the divider as the after", () => {
@@ -12,6 +12,18 @@ describe("after viewer", () => {
     assert.equal(afterHalf(200, 320, 80), false);
     assert.equal(afterHalf(300, 320, 80), true);
     assert.equal(afterHalf(10, 0, 50), false);
+  });
+
+  it("treats only the open side of the divider as the before", () => {
+    assert.equal(beforeHalf(159, 320, 50), true);
+    assert.equal(beforeHalf(160, 320, 50), false);
+    assert.equal(beforeHalf(161, 320, 50), false);
+    assert.equal(beforeHalf(40, 320, 50), true);
+    assert.equal(beforeHalf(200, 320, 80), true);
+    assert.equal(beforeHalf(256, 320, 80), false);
+    assert.equal(beforeHalf(300, 320, 80), false);
+    assert.equal(beforeHalf(10, 0, 50), false);
+    assert.equal(beforeHalf(40, 320, 50) && afterHalf(40, 320, 50), false);
   });
 
   it("does not loop past the ends", () => {
@@ -37,5 +49,8 @@ describe("after viewer", () => {
     assert.match(css, /\.after-viewer \{[\s\S]*?z-index:\s*40/);
     assert.match(css, /\.after-viewer-photo \{[\s\S]*?object-fit:\s*contain/);
     assert.match(css, /\.after-close \{[\s\S]*?min-width:\s*48px;[\s\S]*?min-height:\s*48px;/);
+    assert.match(css, /\.reaction-row \.btn \{[\s\S]*?min-width:\s*48px;[\s\S]*?min-height:\s*48px;/);
+    assert.match(css, /\.rand-entry input \{[\s\S]*?min-height:\s*48px;/);
+    assert.match(css, /\.add-phase,\s*\n\.spend-zone \{[\s\S]*?min-height:\s*48px;/);
   });
 });

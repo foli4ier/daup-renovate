@@ -6,8 +6,9 @@ import { defaultZones } from "../data/zones";
 import { withSharedLook } from "../lib/look";
 import type { StyleId, Tier } from "../lib/prompt";
 import { canOfferAfterUpload } from "../lib/reading";
+import { keepSpendZoneIds, placePhaseZones } from "../lib/spend";
 import { postThreadMessage, seedZoneThread } from "../lib/thread";
-import { emptyLink, withMessages, type CalloutRequest, type Photo, type Plan, type Proposal, type State, type Zone, type ZoneKind } from "./types";
+import { emptyLink, withMessages, type CalloutRequest, type Photo, type Plan, type Proposal, type ReactionKind, type SpendPhase, type State, type Zone, type ZoneKind } from "./types";
 
 const PHOTO_CAP = 6;
 
@@ -53,6 +54,18 @@ export type Action =
   | { type: "skip-zone"; planId: string; zoneId: string }
   | { type: "move-phase"; planId: string; phaseId: string; direction: "up" | "down" }
   | { type: "set-phase-days"; planId: string; phaseId: string; days: number }
+  | { type: "set-available"; planId: string; amount?: number }
+  | { type: "save-spend-phase"; planId: string; phase: SpendPhase }
+  | { type: "move-spend-phase"; planId: string; phaseId: string; direction: "up" | "down" }
+  | {
+      type: "set-reaction";
+      planId: string;
+      zoneId: string;
+      proposalId: string;
+      personId: string;
+      name: string;
+      kind: ReactionKind | null;
+    }
   | { type: "approve-plan"; planId: string }
   | { type: "pushed"; planId: string; projectId: string; projectUrl: string }
   | { type: "sent"; requests: CalloutRequest[] };
@@ -448,6 +461,85 @@ export function reduce(state: State, action: Action): State {
               }
             : plan,
         ),
+      };
+    case "set-available":
+      if (action.amount !== undefined && (!Number.isInteger(action.amount) || action.amount < 0)) return state;
+      return {
+        ...state,
+        plans: state.plans.map((plan) => {
+          if (plan.id !== action.planId) return plan;
+          if (action.amount === undefined) {
+            if (plan.availableToSpend === undefined) return plan;
+            const next = { ...plan };
+            delete next.availableToSpend;
+            return next;
+          }
+          if (plan.availableToSpend === action.amount) return plan;
+          return { ...plan, availableToSpend: action.amount };
+        }),
+      };
+    case "save-spend-phase": {
+      const plan = state.plans.find((item) => item.id === action.planId);
+      if (!plan) return state;
+      const allowed = new Set(
+        state.zones
+          .filter((zone) => zone.propertyId === plan.propertyId && !zone.hidden)
+          .filter((zone) => !state.links.some((link) => link.planId === plan.id && link.zoneId === zone.id && link.skipped))
+          .map((zone) => zone.id),
+      );
+      const zoneIds = keepSpendZoneIds(action.phase.zoneIds, allowed);
+      const name = action.phase.name.trim();
+      if (!name || zoneIds.length === 0) return state;
+      const saved: SpendPhase = { ...action.phase, name, zoneIds };
+      return {
+        ...state,
+        plans: state.plans.map((item) =>
+          item.id === plan.id ? { ...item, spendPhases: placePhaseZones(item.spendPhases ?? [], saved) } : item,
+        ),
+      };
+    }
+    case "move-spend-phase":
+      return {
+        ...state,
+        plans: state.plans.map((plan) => {
+          if (plan.id !== action.planId) return plan;
+          const phases = (plan.spendPhases ?? []).slice().sort((a, b) => a.order - b.order);
+          const index = phases.findIndex((phase) => phase.id === action.phaseId);
+          const swapWith = action.direction === "up" ? index - 1 : index + 1;
+          if (index < 0 || swapWith < 0 || swapWith >= phases.length) return plan;
+          const current = phases[index];
+          const other = phases[swapWith];
+          if (!current || !other) return plan;
+          const next = phases.map((phase) => {
+            if (phase.id === current.id) return { ...phase, order: other.order };
+            if (phase.id === other.id) return { ...phase, order: current.order };
+            return phase;
+          });
+          return { ...plan, spendPhases: next };
+        }),
+      };
+    case "set-reaction":
+      return {
+        ...state,
+        proposals: state.proposals.map((proposal) => {
+          if (proposal.id !== action.proposalId || proposal.planId !== action.planId || proposal.zoneId !== action.zoneId) {
+            return proposal;
+          }
+          const kept = (proposal.reactions ?? []).filter((item) => item.personId !== action.personId);
+          if (!action.kind) {
+            if (!kept.length) {
+              if (!proposal.reactions?.length) return proposal;
+              const next = { ...proposal };
+              delete next.reactions;
+              return next;
+            }
+            return { ...proposal, reactions: kept };
+          }
+          return {
+            ...proposal,
+            reactions: [...kept, { personId: action.personId, name: action.name.trim(), kind: action.kind }],
+          };
+        }),
       };
     case "approve-plan":
       return {
