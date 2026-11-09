@@ -43,6 +43,16 @@ export type Photo = {
   sourceName?: string;
 };
 
+export type ReactionKind = "like" | "dislike";
+
+/** One person's reaction on an after. Uploaded and generated afters use the same list. */
+export type AfterReaction = {
+  personId: string;
+  /** Shown for someone else. The person viewing is displayed as "you". */
+  name: string;
+  kind: ReactionKind;
+};
+
 export type Proposal = {
   id: string;
   planId: string;
@@ -54,6 +64,7 @@ export type Proposal = {
   source?: "generated" | "uploaded";
   width?: number;
   height?: number;
+  reactions?: AfterReaction[];
 };
 
 export type PlanLink = {
@@ -91,7 +102,19 @@ export type Plan = {
   projectUrl?: string;
   /** Last zone the owner opened on this plan. */
   lastZoneId?: string;
+  /** Work list for Project (Prep, Plumbing and electrics). Not spend phases. */
   phases: Phase[];
+  /** Whole rands the owner can spend on this plan. Not the estimate and not a quote. */
+  availableToSpend?: number;
+  /** This plan's spend sequence. A zone sits in at most one of these. */
+  spendPhases?: SpendPhase[];
+};
+
+export type SpendPhase = {
+  id: string;
+  name: string;
+  order: number;
+  zoneIds: string[];
 };
 
 export type CalloutRequest = {

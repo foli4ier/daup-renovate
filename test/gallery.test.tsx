@@ -10,7 +10,9 @@ import Capture from "../src/pages/Capture.tsx";
 import Gallery from "../src/pages/Gallery.tsx";
 import Home from "../src/pages/Home.tsx";
 import Zones from "../src/pages/Zones.tsx";
+import { copy } from "../src/copy.ts";
 import { seed } from "../src/data/seed.ts";
+import { formatRand, formatRange } from "../src/lib/money.ts";
 import { ProvideRenovate, type StoreValue } from "../src/state/store.tsx";
 import { reduce } from "../src/state/reducer.ts";
 import type { Proposal, State } from "../src/state/types.ts";
@@ -64,6 +66,57 @@ function beforeOnly(): State {
 
 function attempts(state: State, zoneId = "zone_front"): number | undefined {
   return state.links.find((link) => link.zoneId === zoneId)?.attempts;
+}
+
+function sixBefores(): State {
+  const state = structuredClone(seed());
+  const index = state.photos.findIndex((photo) => photo.id === "photo_front");
+  const extra = [1, 2, 3, 4, 5].map((n) => ({
+    id: `photo_front_${n}`,
+    zoneId: "zone_front",
+    url: `/esseboom/front-yard-before.svg?n=${n}`,
+    width: 1200,
+    height: 900,
+    starred: false,
+  }));
+  state.photos.splice(index + 1, 0, ...extra);
+  return state;
+}
+
+function reactedAfters(): State {
+  const state = threeAfters();
+  const first = state.proposals.find((item) => item.id === "prop_front");
+  if (!first) throw new Error("front after");
+  first.reactions = [
+    { personId: "sam", name: "Sam", kind: "like" },
+    { personId: "lebo", name: "Lebo", kind: "like" },
+    { personId: "alex", name: "Alex", kind: "dislike" },
+  ];
+  return state;
+}
+
+function approvedBath(): State {
+  const state = structuredClone(seed());
+  const link = state.links.find((item) => item.zoneId === "zone_bath");
+  if (!link) throw new Error("bath");
+  link.approvedProposalId = "prop_bath";
+  return state;
+}
+
+async function setInput(input: HTMLInputElement, value: string) {
+  await act(async () => {
+    const tracker = (input as HTMLInputElement & { _valueTracker?: { setValue: (next: string) => void } })._valueTracker;
+    tracker?.setValue(value === "" ? "x" : "");
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    setter?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+async function blur(input: HTMLInputElement) {
+  await act(async () => {
+    input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+  });
 }
 
 function Harness({ initial, spent, latest }: { initial: State; spent: { n: number }; latest: { state: State } }) {
@@ -210,11 +263,26 @@ function afterImage(): string {
 }
 
 describe("full-screen afters", () => {
-  it("opens from the after half and stays shut for the before half, the range, and a missing after", async () => {
+  it("opens the after from the after half and the before from the before half", async () => {
     const session = await mount("/gallery/zone_front");
     const stage = slider();
-    await click(stage, 40, 20);
+    await click(stage, 160, 20);
     assert.equal(viewer(), null);
+    await click(stage, 40, 20);
+    const beforeOpen = viewer();
+    assert.ok(beforeOpen);
+    assert.equal(beforeOpen.getAttribute("aria-label"), "Before");
+    assert.equal(buttonNamed("Like.", beforeOpen), undefined);
+    assert.equal(buttonNamed("Dislike.", beforeOpen), undefined);
+    assert.equal(beforeOpen.querySelector(".after-count"), null);
+    for (const label of ["Approve.", "Remove.", "Edit.", "Generate.", "Hub.", "Chat."]) {
+      assert.equal(beforeOpen.textContent?.includes(label), false, label);
+    }
+    const beforeClose = buttonNamed("Close.", beforeOpen);
+    if (!beforeClose) throw new Error("Close.");
+    await click(beforeClose);
+    assert.equal(viewer(), null);
+
     const input = document.querySelector<HTMLInputElement>('input[aria-label="Before and after"]');
     if (!input) throw new Error("range");
     await act(async () => {
@@ -227,13 +295,19 @@ describe("full-screen afters", () => {
     assert.equal(viewer(), null);
     await click(input, 300, 100);
     assert.equal(viewer(), null);
-    slider();
-    await click(stage, 200, 20);
+    await click(slider(), 200, 20);
+    assert.equal(viewer()?.getAttribute("aria-label"), "Before");
+    const movedClose = buttonNamed("Close.");
+    if (!movedClose) throw new Error("Close.");
+    await click(movedClose);
     assert.equal(viewer(), null);
-    await click(stage, 300, 20);
+    await click(slider(), 300, 20);
     const open = viewer();
     assert.ok(open);
+    assert.equal(open.getAttribute("aria-label"), "After");
     assert.equal(buttonNamed("Close.", open)?.textContent?.trim(), "Close.");
+    assert.equal(buttonNamed("Like.", open)?.textContent?.trim(), "Like.");
+    assert.equal(buttonNamed("Dislike.", open)?.textContent?.trim(), "Dislike.");
     assert.equal(open.querySelector(".after-count"), null);
     assert.equal(open.querySelector("img")?.getAttribute("src"), "/esseboom/front-yard-after.svg");
     for (const label of ["Approve.", "Remove.", "Edit.", "Generate.", "Hub.", "Chat."]) {
@@ -248,7 +322,11 @@ describe("full-screen afters", () => {
     const before = document.querySelector(".before-only");
     if (!before) throw new Error("before");
     await click(before, 200, 20);
-    assert.equal(viewer(), null);
+    const only = viewer();
+    assert.ok(only);
+    assert.equal(only.getAttribute("aria-label"), "Before");
+    assert.equal(buttonNamed("Like.", only), undefined);
+    assert.equal(only.querySelector("img")?.getAttribute("src"), "/esseboom/front-yard-before.svg");
     assert.equal(quiet.spent.n, 0);
     assert.equal(attempts(quiet.latest.state), 1);
   });
@@ -356,6 +434,234 @@ describe("full-screen afters", () => {
     assert.equal(session.spent.n, 0);
     assert.equal(attempts(session.latest.state), 1);
     assert.equal(window.location.pathname, "/zone/zone_front");
+  });
+});
+
+describe("full-screen befores", () => {
+  it("swipes that zone's befores without looping and keeps the landed before", async () => {
+    const session = await mount("/gallery/zone_front", sixBefores());
+    await click(slider(), 40, 20);
+    const open = viewer();
+    assert.ok(open);
+    assert.equal(open.getAttribute("aria-label"), "Before");
+    assert.equal(open.querySelector(".after-count")?.textContent, "1 of 6");
+    assert.equal(buttonNamed("Like.", open), undefined);
+    await swipe(open, 220, 20);
+    assert.equal(viewer()?.querySelector(".after-count")?.textContent, "2 of 6");
+    assert.equal(viewer()?.querySelector("img")?.getAttribute("src"), "/esseboom/front-yard-before.svg?n=1");
+    await swipe(viewer() ?? open, 20, 220);
+    assert.equal(viewer()?.querySelector(".after-count")?.textContent, "1 of 6");
+    await swipe(viewer() ?? open, 20, 220);
+    assert.equal(viewer()?.querySelector(".after-count")?.textContent, "1 of 6");
+    for (let step = 0; step < 5; step += 1) await swipe(viewer() ?? open, 220, 20);
+    assert.equal(viewer()?.querySelector(".after-count")?.textContent, "6 of 6");
+    await swipe(viewer() ?? open, 220, 20);
+    assert.equal(viewer()?.querySelector(".after-count")?.textContent, "6 of 6");
+    await swipe(viewer() ?? open, 20, 220);
+    assert.equal(viewer()?.querySelector(".after-count")?.textContent, "5 of 6");
+    const close = buttonNamed("Close.");
+    if (!close) throw new Error("Close.");
+    await click(close);
+    assert.equal(viewer(), null);
+    assert.equal(document.querySelector<HTMLImageElement>(".before-shot")?.getAttribute("src"), "/esseboom/front-yard-before.svg?n=4");
+    assert.equal(afterImage(), "/esseboom/front-yard-after.svg");
+    assert.equal(session.spent.n, 0);
+    assert.equal(attempts(session.latest.state), 1);
+    assert.equal(window.location.pathname, "/gallery/zone_front");
+  });
+
+  it("does not open a viewer from the zones grid", async () => {
+    await mount("/plan");
+    assert.equal(viewer(), null);
+    assert.equal(buttonNamed("Add a phase."), undefined);
+    const tile = document.querySelector(".zone-tile");
+    if (!tile) throw new Error("tile");
+    await click(tile);
+    assert.equal(viewer(), null);
+  });
+});
+
+describe("after reactions", () => {
+  it("toggles like and dislike by name without using a try", async () => {
+    const session = await mount("/gallery/zone_front?picture=prop_front", reactedAfters());
+    await click(slider(), 280, 20);
+    const open = viewer();
+    assert.ok(open);
+    assert.equal(open.querySelector(".after-count")?.textContent, "1 of 3");
+    assert.equal(open.textContent?.includes("Nobody yet."), false);
+    assert.equal(open.textContent?.includes("Liked by Sam and Lebo."), true);
+    assert.equal(open.textContent?.includes("Disliked by Alex."), true);
+    assert.equal(document.querySelector("#proposal-thumbs")?.textContent?.includes("Like."), false);
+    const like = buttonNamed("Like.", open);
+    const dislike = buttonNamed("Dislike.", open);
+    if (!like || !dislike) throw new Error("reactions");
+    await click(like);
+    assert.equal(viewer()?.textContent?.includes("Liked by you, Sam, and Lebo."), true);
+    assert.equal(like.getAttribute("aria-pressed"), "true");
+    assert.equal(attempts(session.latest.state), 1);
+    await click(like);
+    assert.equal(viewer()?.textContent?.includes("Liked by you"), false);
+    assert.equal(viewer()?.textContent?.includes("Liked by Sam and Lebo."), true);
+    assert.equal(like.getAttribute("aria-pressed"), "false");
+    await click(dislike);
+    assert.equal(viewer()?.textContent?.includes("Disliked by you and Alex."), true);
+    assert.equal(dislike.getAttribute("aria-pressed"), "true");
+    assert.equal(like.getAttribute("aria-pressed"), "false");
+    await swipe(viewer() ?? open, 220, 20);
+    assert.equal(viewer()?.querySelector(".after-count")?.textContent, "2 of 3");
+    assert.equal(viewer()?.querySelector("img")?.getAttribute("src"), "/esseboom/living-area-after.svg");
+    const uploadedLike = buttonNamed("Like.", viewer() ?? open);
+    if (!uploadedLike) throw new Error("uploaded like");
+    await click(uploadedLike);
+    const uploaded = session.latest.state.proposals.find((item) => item.id === "prop_front_b");
+    assert.equal(uploaded?.source, "uploaded");
+    assert.equal(uploaded?.reactions?.some((item) => item.personId === "owner_you" && item.kind === "like"), true);
+    assert.equal(/budget|price|quote|R\d/i.test(viewer()?.textContent ?? ""), false);
+    assert.equal(session.spent.n, 0);
+    assert.equal(attempts(session.latest.state), 1);
+  });
+});
+
+describe("available to spend", () => {
+  it("keeps the ceiling beside the estimate and shows an over line only when a figure is past it", async () => {
+    const session = await mount("/budget", approvedBath());
+    const input = document.querySelector<HTMLInputElement>("#available-to-spend");
+    const total = document.querySelector(".total");
+    const field = document.querySelector(".available-spend");
+    if (!input || !total || !field) throw new Error("budget");
+    assert.equal(total.textContent, formatRange(15000, 45000));
+    assert.equal(field.textContent?.includes(copy.addAmount), true);
+    assert.equal(document.body.textContent?.includes(copy.estimateOver), false);
+    assert.equal(document.body.textContent?.includes(copy.highEstimateOver), false);
+    assert.equal(field.compareDocumentPosition(total) & Node.DOCUMENT_POSITION_FOLLOWING, Node.DOCUMENT_POSITION_FOLLOWING);
+    const privacy = [...document.querySelectorAll("p")].find((node) => node.textContent === copy.youOnly);
+    assert.ok(privacy);
+    assert.equal(privacy.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING, Node.DOCUMENT_POSITION_FOLLOWING);
+
+    await setInput(input, "50000");
+    assert.equal(session.latest.state.plans[0]?.availableToSpend, undefined);
+    await blur(input);
+    assert.equal(session.latest.state.plans[0]?.availableToSpend, 50000);
+    assert.equal(input.value, "50,000");
+    assert.equal(document.body.textContent?.includes(copy.addAmount), false);
+    assert.equal(document.body.textContent?.includes(copy.estimateOver), false);
+    assert.equal(document.body.textContent?.includes(copy.highEstimateOver), false);
+    assert.equal(document.querySelector(".total")?.textContent, formatRange(15000, 45000));
+
+    await setInput(input, "20000");
+    await blur(input);
+    assert.equal(document.body.textContent?.includes(copy.highEstimateOver), true);
+    assert.equal(document.body.textContent?.includes(copy.estimateOver), false);
+
+    await setInput(input, "10000");
+    await blur(input);
+    assert.equal(document.body.textContent?.includes(copy.estimateOver), true);
+    assert.equal(document.body.textContent?.includes(copy.highEstimateOver), false);
+    assert.equal(document.querySelector("#approve"), null);
+
+    await setInput(input, "");
+    await blur(input);
+    assert.equal(session.latest.state.plans[0]?.availableToSpend, undefined);
+    assert.equal(document.body.textContent?.includes(copy.addAmount), true);
+    assert.equal(document.body.textContent?.includes(copy.estimateOver), false);
+    assert.equal(document.body.textContent?.includes(copy.highEstimateOver), false);
+    assert.equal(buttonNamed("Add a phase."), undefined);
+  });
+});
+
+describe("spend phases", () => {
+  it("adds a phase under the current plan and does not double-count a zone", async () => {
+    const session = await mount("/");
+    const spend = document.querySelector(".spend-phases");
+    const add = buttonNamed("Add a phase.");
+    const start = buttonNamed("Start a plan.");
+    const home = document.querySelector(".home-card");
+    if (!spend || !add || !start || !home) throw new Error("home");
+    assert.equal(home.compareDocumentPosition(spend) & Node.DOCUMENT_POSITION_FOLLOWING, Node.DOCUMENT_POSITION_FOLLOWING);
+    assert.equal(spend.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING, Node.DOCUMENT_POSITION_FOLLOWING);
+    assert.equal(spend.textContent?.includes("Prep"), false);
+    assert.equal(spend.textContent?.includes("Plumbing"), false);
+    assert.equal(buttonNamed("Bedroom 1"), undefined);
+
+    await click(add);
+    assert.equal(buttonNamed("Add this phase.")?.hasAttribute("disabled"), true);
+    assert.equal(buttonNamed("Bedroom 1"), undefined);
+    await click(buttonNamed("Close.") ?? add);
+    assert.equal(document.querySelector(".spend-card"), null);
+
+    await click(buttonNamed("Add a phase.") ?? add);
+    const kitchen = buttonNamed("Kitchen");
+    const bath = buttonNamed("Bathroom 1");
+    if (!kitchen || !bath) throw new Error("zones");
+    await click(kitchen);
+    await click(bath);
+    const save = buttonNamed("Add this phase.");
+    if (!save) throw new Error("save");
+    await click(save);
+    const first = document.querySelector(".spend-open");
+    assert.equal(first?.textContent?.includes("Kitchen · Bathroom 1"), true);
+    assert.equal(first?.textContent?.includes(formatRange(60000, 195000)), true);
+    assert.equal(document.body.textContent?.includes(copy.addSpendOnBudget), true);
+    assert.equal(document.body.textContent?.includes("of R"), false);
+
+    await click(buttonNamed("Add a phase.") ?? add);
+    const kitchenAgain = buttonNamed("Kitchen");
+    if (!kitchenAgain) throw new Error("kitchen");
+    await click(kitchenAgain);
+    await click(buttonNamed("Add this phase.") ?? save);
+    const cards = [...document.querySelectorAll(".spend-open")];
+    assert.equal(cards.length, 2);
+    assert.equal(cards[0]?.textContent?.includes("Bathroom 1"), true);
+    assert.equal(cards[0]?.textContent?.includes("Kitchen"), false);
+    assert.equal(cards[0]?.textContent?.includes(formatRange(15000, 45000)), true);
+    assert.equal(cards[1]?.textContent?.includes("Kitchen"), true);
+    assert.equal(cards[1]?.textContent?.includes(formatRange(45000, 150000)), true);
+    const phases = session.latest.state.plans[0]?.spendPhases ?? [];
+    const membership = phases.flatMap((phase) => phase.zoneIds);
+    assert.equal(membership.filter((id) => id === "zone_kitchen").length, 1);
+    assert.equal(membership.filter((id) => id === "zone_bath").length, 1);
+    assert.equal(session.latest.state.plans[0]?.phases.some((phase) => phase.name === "Prep"), true);
+
+    const down = buttonNamed("Move down.");
+    if (!down) throw new Error("move");
+    await click(down);
+    const moved = [...document.querySelectorAll(".spend-open")];
+    assert.equal(moved[0]?.textContent?.includes("Kitchen"), true);
+    assert.equal(moved[1]?.textContent?.includes("Bathroom 1"), true);
+    await mount("/budget");
+    assert.equal(buttonNamed("Add a phase."), undefined);
+    await mount("/plan");
+    assert.equal(buttonNamed("Add a phase."), undefined);
+  });
+
+  it("shows a phase slice against the ceiling and one over line", async () => {
+    const state = approvedBath();
+    const plan = state.plans[0];
+    if (!plan) throw new Error("plan");
+    plan.availableToSpend = 50000;
+    plan.spendPhases = [{ id: "sp1", name: "Phase 1", order: 1, zoneIds: ["zone_bath"] }];
+    await mount("/", state);
+    const card = document.querySelector(".spend-open");
+    assert.equal(card?.textContent?.includes("Bathroom 1"), true);
+    assert.equal(card?.textContent?.includes(`${formatRange(15000, 45000)} of ${formatRand(50000)}`), true);
+    assert.equal(document.body.textContent?.includes(copy.phasesOver), false);
+    assert.equal(document.body.textContent?.includes(copy.addSpendOnBudget), false);
+
+    plan.availableToSpend = 10000;
+    await mount("/", state);
+    assert.equal(document.body.textContent?.includes(copy.phasesOver), true);
+    assert.equal(document.querySelector(".available-spend"), null);
+  });
+
+  it("hides spend phases when there is no current plan", async () => {
+    const state = structuredClone(seed());
+    state.plans = [];
+    state.links = [];
+    state.proposals = [];
+    state.activePlanId = null;
+    await mount("/", state);
+    assert.equal(buttonNamed("Add a phase."), undefined);
+    assert.equal(document.querySelector(".spend-phases"), null);
   });
 });
 

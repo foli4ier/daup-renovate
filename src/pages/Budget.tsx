@@ -1,13 +1,57 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { copy } from "../copy";
 import { tierLabel } from "../data/guides";
 import { ActionBar, Wordmark } from "../components/Chrome";
-import { formatRand, formatRange } from "../lib/money";
+import { formatRand, formatRange, groupedRands } from "../lib/money";
 import { rateGuide, tierTotal, type MoneyLine } from "../lib/budget";
+import { ceilingNote, parseWholeRands } from "../lib/spend";
 import type { Tier } from "../lib/prompt";
 import { activePlan, budgetLines, budgetReport, proposalsFor } from "../state/select";
 import { useRenovate } from "../state/store";
+
+function AvailableSpend({ amount, onCommit }: { amount?: number; onCommit: (amount?: number) => void }) {
+  const [text, setText] = useState(amount === undefined ? "" : groupedRands(amount));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setText(amount === undefined ? "" : groupedRands(amount));
+  }, [amount, focused]);
+
+  return (
+    <div className="available-spend">
+      <label className="field" htmlFor="available-to-spend">
+        {copy.availableToSpend}
+        <span className="rand-entry">
+          <span className="rand-prefix" aria-hidden="true">
+            R
+          </span>
+          <input
+            id="available-to-spend"
+            inputMode="numeric"
+            autoComplete="off"
+            value={text}
+            onFocus={() => setFocused(true)}
+            onChange={(event) => {
+              const next = parseWholeRands(event.target.value);
+              setText(next === undefined ? "" : groupedRands(next));
+            }}
+            onBlur={(event) => {
+              const amount = parseWholeRands(event.currentTarget.value);
+              setFocused(false);
+              setText(amount === undefined ? "" : groupedRands(amount));
+              onCommit(amount);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
+            }}
+          />
+        </span>
+      </label>
+      {text === "" ? <p className="meta">{copy.addAmount}</p> : null}
+    </div>
+  );
+}
 
 function Line({ line, tier }: { line: MoneyLine; tier: Tier }) {
   if (line.quoteOnly) {
@@ -48,7 +92,7 @@ function Line({ line, tier }: { line: MoneyLine; tier: Tier }) {
 }
 
 export default function Budget() {
-  const { state } = useRenovate();
+  const { state, dispatch } = useRenovate();
   const plan = activePlan(state);
   const [tier, setTier] = useState<Tier>("mid");
   if (!plan) {
@@ -62,6 +106,7 @@ export default function Budget() {
   }
   const groups = budgetLines(state, plan);
   const report = budgetReport(groups);
+  const overLine = ceilingNote(report, plan.availableToSpend);
   const mid = report.ready
     ? tierTotal(
         groups.flatMap((group) => group.lines),
@@ -76,6 +121,11 @@ export default function Budget() {
       <p className="banner">{copy.bannerEstimate}</p>
       <p>{copy.youOnly}</p>
       <p className="meta">{copy.budgetsStay}</p>
+      <AvailableSpend
+        key={plan.id}
+        amount={plan.availableToSpend}
+        onCommit={(amount) => dispatch({ type: "set-available", planId: plan.id, amount })}
+      />
       {groups.length === 0 ? (
         <>
           <p style={{ marginTop: 16 }}>{copy.approveFirst}</p>
@@ -95,6 +145,7 @@ export default function Budget() {
               <Link className="text-btn" to="/plan?edit=1">{copy.addSize}</Link>
             </>
           )}
+          {overLine ? <p className="spend-note">{overLine}</p> : null}
           {report.quoteOnly > 0 ? <p className="meta">{copy.quoteOutside}</p> : null}
           <div className="tier-row" role="group" aria-label="Low, mid, or high">
             {(["low", "mid", "high"] as const).map((item) => (

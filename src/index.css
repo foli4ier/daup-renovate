@@ -1323,6 +1323,153 @@ select:focus-visible {
   pointer-events: none;
 }
 
+.viewer-foot {
+  position: absolute;
+  z-index: 1;
+  left: 12px;
+  right: 12px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.viewer-foot .after-count {
+  position: static;
+  left: auto;
+  right: auto;
+  bottom: auto;
+}
+
+.before-open {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.reaction-row {
+  display: flex;
+  gap: 8px;
+}
+
+.reaction-row .btn {
+  flex: 1 1 0;
+  min-width: 48px;
+  min-height: 48px;
+}
+
+.reaction-row .btn[aria-pressed="true"] {
+  background: var(--sage);
+  color: #0f1311;
+  border-color: var(--sage);
+}
+
+.reaction-names {
+  margin: 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 650;
+  color: rgba(243, 239, 231, 0.92);
+}
+
+.available-spend {
+  margin-top: 16px;
+}
+
+.available-spend .field {
+  margin-bottom: 0;
+}
+
+.rand-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+}
+
+.rand-prefix {
+  font-size: 22px;
+  font-weight: 750;
+}
+
+.rand-entry input {
+  flex: 1;
+  min-height: 48px;
+  font-size: 22px;
+  font-weight: 750;
+}
+
+.spend-note,
+.spend-over {
+  margin: 8px 0 0;
+  font-weight: 650;
+}
+
+.spend-phases {
+  margin-top: 12px;
+}
+
+.spend-open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+
+.spend-zones,
+.spend-range {
+  font-weight: 650;
+}
+
+.spend-moves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.add-phase,
+.spend-zone {
+  min-height: 48px;
+}
+
+.zone-row[aria-pressed="true"] {
+  background: rgba(111, 174, 146, 0.22);
+}
+
+.phase-rename {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+  font-size: 26px;
+  letter-spacing: -0.04em;
+  text-align: left;
+}
+
+input.phase-rename {
+  border-bottom: 1px solid var(--line);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn:hover {
     transform: none;

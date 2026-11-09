@@ -7,14 +7,31 @@ import { BeforeAfter } from "./Chrome";
 
 export type AfterPicture = { id: string; imageUrl: string };
 
+type ReelFlag = "afterViewer" | "beforeViewer";
+
+function isReelOpen(state: unknown, flag: ReelFlag): boolean {
+  if (flag === "afterViewer") return isAfterViewerState(state);
+  if (!state || typeof state !== "object") return false;
+  return (state as { beforeViewer?: unknown }).beforeViewer === true;
+}
+
 export function useAfterLightbox(
+  pictures: AfterPicture[],
+  selectedId: string | undefined,
+  onSelect: (id: string) => void,
+) {
+  return useReel("afterViewer", pictures, selectedId, onSelect);
+}
+
+function useReel(
+  flag: ReelFlag,
   pictures: AfterPicture[],
   selectedId: string | undefined,
   onSelect: (id: string) => void,
 ) {
   const location = useLocation();
   const navigate = useNavigate();
-  const open = isAfterViewerState(location.state);
+  const open = isReelOpen(location.state, flag);
   const openRef = useRef(open);
   openRef.current = open;
   const pushed = useRef(false);
@@ -35,9 +52,9 @@ export function useAfterLightbox(
     pushed.current = true;
     navigate(
       { pathname: location.pathname, search: location.search, hash: location.hash },
-      { state: { afterViewer: true } },
+      { state: { [flag]: true } },
     );
-  }, [navigate, location.pathname, location.search, location.hash, selectedId, index]);
+  }, [navigate, location.pathname, location.search, location.hash, selectedId, index, flag]);
 
   const closeViewer = useCallback(() => {
     if (!openRef.current || closing.current) return;
@@ -69,15 +86,20 @@ export function AfterViewer({
   imageUrl,
   place,
   total,
+  label = "After",
   onClose,
   onMove,
+  children,
 }: {
   imageUrl: string;
   place: number;
   total: number;
+  label?: string;
   onClose: () => void;
   onMove: (delta: number) => void;
+  children?: ReactNode;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const start = useRef<{ x: number; y: number; id: number } | null>(null);
   const onCloseRef = useRef(onClose);
@@ -96,10 +118,21 @@ export function AfterViewer({
         onCloseRef.current();
         return;
       }
-      if (event.key === "Tab") {
+      if (event.key !== "Tab") return;
+      const list = dialogRef.current
+        ? [...dialogRef.current.querySelectorAll<HTMLElement>("button")].filter((item) => !item.hasAttribute("disabled"))
+        : [];
+      if (!list.length) {
         event.preventDefault();
         closeRef.current?.focus();
+        return;
       }
+      event.preventDefault();
+      const index = list.indexOf(document.activeElement as HTMLElement);
+      const next = event.shiftKey
+        ? list[(index <= 0 ? list.length : index) - 1]
+        : list[(index + 1) % list.length];
+      (next ?? list[0])?.focus();
     };
     document.addEventListener("keydown", onKey);
     return () => {
@@ -135,12 +168,20 @@ export function AfterViewer({
     else if (gesture === "close") onClose();
   }
 
+  const count =
+    total > 1 ? (
+      <p className="after-count" aria-live="polite">
+        {copy.afterCount(place, total)}
+      </p>
+    ) : null;
+
   return createPortal(
     <div
+      ref={dialogRef}
       className="after-viewer"
       role="dialog"
       aria-modal="true"
-      aria-label="After"
+      aria-label={label}
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerCancel={() => {
@@ -151,50 +192,81 @@ export function AfterViewer({
         {copy.close}
       </button>
       <img className="after-viewer-photo" src={imageUrl} alt="" draggable={false} />
-      {total > 1 ? (
-        <p className="after-count" aria-live="polite">
-          {copy.afterCount(place, total)}
-        </p>
-      ) : null}
+      {children ? (
+        <div className="viewer-foot">
+          {children}
+          {count}
+        </div>
+      ) : (
+        count
+      )}
     </div>,
     document.body,
   );
 }
 
 export function GalleryStage({
-  beforeUrl,
+  befores,
+  beforeId,
+  onSelectBefore,
   pictures,
   selectedId,
   onSelect,
   empty,
+  afterFooter,
 }: {
-  beforeUrl?: string;
+  befores: AfterPicture[];
+  beforeId?: string;
+  onSelectBefore: (id: string) => void;
   pictures: AfterPicture[];
   selectedId?: string;
   onSelect: (id: string) => void;
   empty: ReactNode;
+  afterFooter?: ReactNode;
 }) {
-  const box = useAfterLightbox(pictures, selectedId, onSelect);
+  const beforeReel = useReel("beforeViewer", befores, beforeId, onSelectBefore);
+  const afterReel = useAfterLightbox(pictures, selectedId, onSelect);
   const current = pictures.find((picture) => picture.id === selectedId);
+  const before = befores.find((picture) => picture.id === beforeId);
   return (
     <>
       <div className="photo-stage">
-        {current && beforeUrl ? (
-          <BeforeAfter before={beforeUrl} after={current.imageUrl} onOpenAfter={box.openViewer} />
-        ) : beforeUrl ? (
-          <img className="before-only" src={beforeUrl} alt="" />
+        {current && before ? (
+          <BeforeAfter
+            before={before.imageUrl}
+            after={current.imageUrl}
+            onOpenAfter={afterReel.openViewer}
+            onOpenBefore={befores.length ? beforeReel.openViewer : undefined}
+          />
+        ) : before ? (
+          <button className="before-open" type="button" onClick={beforeReel.openViewer}>
+            <img className="before-only" src={before.imageUrl} alt="" />
+          </button>
         ) : (
           empty
         )}
       </div>
-      {box.open && current ? (
+      {beforeReel.open && before ? (
         <AfterViewer
-          imageUrl={current.imageUrl}
-          place={box.index + 1}
-          total={pictures.length}
-          onClose={box.closeViewer}
-          onMove={box.move}
+          label="Before"
+          imageUrl={before.imageUrl}
+          place={beforeReel.index + 1}
+          total={befores.length}
+          onClose={beforeReel.closeViewer}
+          onMove={beforeReel.move}
         />
+      ) : null}
+      {afterReel.open && current ? (
+        <AfterViewer
+          label="After"
+          imageUrl={current.imageUrl}
+          place={afterReel.index + 1}
+          total={pictures.length}
+          onClose={afterReel.closeViewer}
+          onMove={afterReel.move}
+        >
+          {afterFooter}
+        </AfterViewer>
       ) : null}
     </>
   );

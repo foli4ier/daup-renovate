@@ -1,8 +1,20 @@
+function splitX(width: number, splitPercent: number): number | null {
+  if (!(width > 0) || !Number.isFinite(splitPercent)) return null;
+  return (Math.min(100, Math.max(0, splitPercent)) / 100) * width;
+}
+
 /** Tap lands on the visible after, to the right of the comparison divider. */
 export function afterHalf(x: number, width: number, splitPercent: number): boolean {
-  if (!(width > 0) || !Number.isFinite(x) || !Number.isFinite(splitPercent)) return false;
-  const split = (Math.min(100, Math.max(0, splitPercent)) / 100) * width;
+  const split = splitX(width, splitPercent);
+  if (split === null || !Number.isFinite(x)) return false;
   return x > split;
+}
+
+/** Tap lands on the visible before, to the left of the comparison divider. */
+export function beforeHalf(x: number, width: number, splitPercent: number): boolean {
+  const split = splitX(width, splitPercent);
+  if (split === null || !Number.isFinite(x)) return false;
+  return x < split;
 }
 
 /** Step within the zone's afters. Stays put at either end. */

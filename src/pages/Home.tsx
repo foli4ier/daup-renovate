@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { copy } from "../copy";
 import { OpenProperty, PropertyCards } from "../components/PropertyStatus";
 import { Sheet, StepRail, Wordmark } from "../components/Chrome";
+import { SpendPhases } from "../components/SpendPhases";
 import { statusLabel } from "../lib/status";
 import { activePlan, activeProperty, approvedCount, continuePath, coverUrl, zonePill } from "../state/select";
 import { useRenovate } from "../state/store";
@@ -108,6 +109,8 @@ export default function Home() {
           </button>
         </section>
       )}
+
+      {plan ? <SpendPhases /> : null}
 
       {plan ? (
         <button
