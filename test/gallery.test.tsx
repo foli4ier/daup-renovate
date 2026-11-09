@@ -601,6 +601,8 @@ describe("spend phases", () => {
     const first = document.querySelector(".spend-open");
     assert.equal(first?.textContent?.includes("Kitchen · Bathroom 1"), true);
     assert.equal(first?.textContent?.includes(formatRange(60000, 195000)), true);
+    assert.equal(buttonNamed("Move up."), undefined);
+    assert.equal(buttonNamed("Move down."), undefined);
     assert.equal(document.body.textContent?.includes(copy.addSpendOnBudget), true);
     assert.equal(document.body.textContent?.includes("of R"), false);
 
@@ -616,6 +618,14 @@ describe("spend phases", () => {
     assert.equal(cards[0]?.textContent?.includes(formatRange(15000, 45000)), true);
     assert.equal(cards[1]?.textContent?.includes("Kitchen"), true);
     assert.equal(cards[1]?.textContent?.includes(formatRange(45000, 150000)), true);
+    const phaseCards = [...document.querySelectorAll(".spend-card")];
+    const firstCard = phaseCards[0];
+    const lastCard = phaseCards[1];
+    if (!firstCard || !lastCard) throw new Error("cards");
+    assert.equal(buttonNamed("Move up.", firstCard), undefined);
+    assert.ok(buttonNamed("Move down.", firstCard));
+    assert.ok(buttonNamed("Move up.", lastCard));
+    assert.equal(buttonNamed("Move down.", lastCard), undefined);
     const phases = session.latest.state.plans[0]?.spendPhases ?? [];
     const membership = phases.flatMap((phase) => phase.zoneIds);
     assert.equal(membership.filter((id) => id === "zone_kitchen").length, 1);
@@ -642,6 +652,8 @@ describe("spend phases", () => {
     plan.spendPhases = [{ id: "sp1", name: "Phase 1", order: 1, zoneIds: ["zone_bath"] }];
     await mount("/", state);
     const card = document.querySelector(".spend-open");
+    assert.equal(buttonNamed("Move up."), undefined);
+    assert.equal(buttonNamed("Move down."), undefined);
     assert.equal(card?.textContent?.includes("Bathroom 1"), true);
     assert.equal(card?.textContent?.includes(`${formatRange(15000, 45000)} of ${formatRand(50000)}`), true);
     assert.equal(document.body.textContent?.includes(copy.phasesOver), false);

@@ -172,7 +172,27 @@ describe("spend phases", () => {
     assert.deepEqual(names, ["Phase 2", "Phase 1"]);
     const stuck = reduce(moved, { type: "move-spend-phase", planId: "plan_refresh", phaseId: "sp2", direction: "up" });
     assert.equal(stuck.plans[0]?.spendPhases, moved.plans[0]?.spendPhases);
+    const ordered = (moved.plans[0]?.spendPhases ?? []).slice().sort((a, b) => a.order - b.order);
+    const first = ordered[0];
+    const last = ordered[ordered.length - 1];
+    if (!first || !last) throw new Error("ends");
+    const firstUp = reduce(moved, { type: "move-spend-phase", planId: "plan_refresh", phaseId: first.id, direction: "up" });
+    const lastDown = reduce(moved, { type: "move-spend-phase", planId: "plan_refresh", phaseId: last.id, direction: "down" });
+    assert.equal(firstUp.plans[0]?.spendPhases, moved.plans[0]?.spendPhases);
+    assert.equal(lastDown.plans[0]?.spendPhases, moved.plans[0]?.spendPhases);
     assert.equal(placePhaseZones([], { id: "sp", name: " ", order: 1, zoneIds: ["zone_bath"] }).length, 0);
+  });
+
+  it("does not move an only phase up or down", () => {
+    const state = reduce(seed(), {
+      type: "save-spend-phase",
+      planId: "plan_refresh",
+      phase: { id: "sp1", name: "Phase 1", order: 1, zoneIds: ["zone_bath"] },
+    });
+    const up = reduce(state, { type: "move-spend-phase", planId: "plan_refresh", phaseId: "sp1", direction: "up" });
+    const down = reduce(state, { type: "move-spend-phase", planId: "plan_refresh", phaseId: "sp1", direction: "down" });
+    assert.equal(up.plans[0]?.spendPhases, state.plans[0]?.spendPhases);
+    assert.equal(down.plans[0]?.spendPhases, state.plans[0]?.spendPhases);
   });
 });
 

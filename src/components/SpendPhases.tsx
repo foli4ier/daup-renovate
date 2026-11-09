@@ -97,6 +97,8 @@ export function SpendPhases() {
             const slice = slices[index];
             if (!slice) return null;
             const range = slice.ready ? phaseRangeText(slice.low, slice.high, currentPlan.availableToSpend) : "";
+            const canUp = index > 0;
+            const canDown = index < phases.length - 1;
             return (
               <article key={phase.id} className="card spend-card">
                 <button className="spend-open" type="button" onClick={() => openEdit(phase)}>
@@ -105,26 +107,32 @@ export function SpendPhases() {
                   {range ? <span className="spend-range">{range}</span> : null}
                   {slice.needsSize ? <span className="meta">{copy.addSizeForTotal}</span> : null}
                 </button>
-                <div className="spend-moves">
-                  <button
-                    className="icon-btn"
-                    type="button"
-                    onClick={() =>
-                      dispatch({ type: "move-spend-phase", planId: currentPlan.id, phaseId: phase.id, direction: "up" })
-                    }
-                  >
-                    {copy.moveUp}
-                  </button>
-                  <button
-                    className="icon-btn"
-                    type="button"
-                    onClick={() =>
-                      dispatch({ type: "move-spend-phase", planId: currentPlan.id, phaseId: phase.id, direction: "down" })
-                    }
-                  >
-                    {copy.moveDown}
-                  </button>
-                </div>
+                {canUp || canDown ? (
+                  <div className="spend-moves">
+                    {canUp ? (
+                      <button
+                        className="icon-btn"
+                        type="button"
+                        onClick={() =>
+                          dispatch({ type: "move-spend-phase", planId: currentPlan.id, phaseId: phase.id, direction: "up" })
+                        }
+                      >
+                        {copy.moveUp}
+                      </button>
+                    ) : null}
+                    {canDown ? (
+                      <button
+                        className="icon-btn"
+                        type="button"
+                        onClick={() =>
+                          dispatch({ type: "move-spend-phase", planId: currentPlan.id, phaseId: phase.id, direction: "down" })
+                        }
+                      >
+                        {copy.moveDown}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
               </article>
             );
           })}
