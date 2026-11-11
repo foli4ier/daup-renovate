@@ -65,6 +65,8 @@ export type Proposal = {
   width?: number;
   height?: number;
   reactions?: AfterReaction[];
+  /** Set when Generate. used a before that is too small to come out sharp. */
+  softBefore?: boolean;
 };
 
 export type PlanLink = {
@@ -108,6 +110,24 @@ export type Plan = {
   availableToSpend?: number;
   /** This plan's spend sequence. A zone sits in at most one of these. */
   spendPhases?: SpendPhase[];
+  /** Picture-chat decisions for this plan. Older documents omit the list. */
+  decisions?: Decision[];
+};
+
+export type DecisionColumn = "backlog" | "approved" | "rejected" | "archived";
+
+export type Decision = {
+  id: string;
+  zoneId: string;
+  pictureId: string;
+  line: string;
+  column: DecisionColumn;
+  /** True until the owner moves the card. */
+  suggested: boolean;
+  /** The owner rewrote the line, so a later message does not replace it. */
+  edited?: boolean;
+  createdAt: string;
+  messageIds: string[];
 };
 
 export type SpendPhase = {
@@ -136,6 +156,8 @@ export type ThreadMessage = {
   createdAt: string;
   chips?: string[];
   questionId?: string;
+  /** Set when the message is about one before or after. Older messages omit it. */
+  pictureId?: string;
 };
 
 export type State = {

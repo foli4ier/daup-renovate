@@ -3,8 +3,9 @@ import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-
 import { copy } from "../copy";
 import { questionsFor } from "../data/questions";
 import { threadLeak } from "../lib/leak";
-import { PROMPT_AUTHOR } from "../lib/thread";
+import { messageAuthorLabel, messageClock, PROMPT_AUTHOR } from "../lib/thread";
 import { TopBar } from "../components/Chrome";
+import { OpenPicture } from "../components/AfterViewer";
 import { useVisitZone } from "../components/ZoneNav";
 import { activePlan, activeProperty } from "../state/select";
 import { useRenovate } from "../state/store";
@@ -12,12 +13,6 @@ import { useRenovate } from "../state/store";
 export function QuestionsRedirect() {
   const { zoneId = "" } = useParams();
   return <Navigate to={`/zone/${zoneId}/chat?from=capture`} replace />;
-}
-
-function messageTime(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" });
 }
 
 export default function Chat() {
@@ -31,6 +26,7 @@ export default function Chat() {
   const ownerId = property?.ownerId ?? "";
   const [draft, setDraft] = useState("");
   const [hint, setHint] = useState("");
+  const [openPicture, setOpenPicture] = useState<string | null>(null);
   useVisitZone(zoneId);
 
   useEffect(() => {
@@ -80,7 +76,7 @@ export default function Chat() {
       <div className="thread" id="thread" role="log" aria-label={currentZone.name}>
         {messages.map((message) => {
           const mine = message.authorId === ownerId;
-          const label = mine ? "You" : message.authorId === PROMPT_AUTHOR ? null : message.authorId;
+          const label = messageAuthorLabel(message.authorId, ownerId);
           const chips =
             message.authorId === PROMPT_AUTHOR && message.questionId && message.chips && !answered.has(message.questionId)
               ? message.chips
@@ -88,10 +84,13 @@ export default function Chat() {
           return (
             <article key={message.id} className={mine ? "message mine" : "message"}>
               <p className="message-meta">
-                {label ? <span>{label}</span> : null}
-                <time dateTime={message.createdAt}>{messageTime(message.createdAt)}</time>
+                <span>{label}</span>
+                <time dateTime={message.createdAt}>{messageClock(message.createdAt)}</time>
               </p>
               <p className="message-text">{message.text}</p>
+              {message.pictureId ? (
+                <PictureThumb statePhotos={state.photos} proposals={state.proposals} pictureId={message.pictureId} onOpen={setOpenPicture} />
+              ) : null}
               {chips.length ? (
                 <div className="message-chips">
                   {chips.map((chip) => (
@@ -128,6 +127,43 @@ export default function Chat() {
           </button>
         </div>
       </form>
+      {openPicture ? (
+        <OpenPicture
+          kind={state.photos.some((photo) => photo.id === openPicture) ? "before" : "after"}
+          planId={plan.id}
+          zoneId={currentZone.id}
+          pictureId={openPicture}
+          imageUrl={
+            state.photos.find((photo) => photo.id === openPicture)?.url ??
+            state.proposals.find((item) => item.id === openPicture)?.imageUrl ??
+            ""
+          }
+          place={1}
+          total={1}
+          onClose={() => setOpenPicture(null)}
+          onMove={() => undefined}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function PictureThumb({
+  statePhotos,
+  proposals,
+  pictureId,
+  onOpen,
+}: {
+  statePhotos: { id: string; url: string }[];
+  proposals: { id: string; imageUrl: string }[];
+  pictureId: string;
+  onOpen: (id: string) => void;
+}) {
+  const url = statePhotos.find((photo) => photo.id === pictureId)?.url ?? proposals.find((item) => item.id === pictureId)?.imageUrl;
+  if (!url) return null;
+  return (
+    <button className="message-thumb-hit" type="button" onClick={() => onOpen(pictureId)} aria-label="Open picture">
+      <img className="message-thumb" src={url} alt="" />
+    </button>
   );
 }

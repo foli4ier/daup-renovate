@@ -6,6 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { useState } from "react";
 import Budget from "../src/pages/Budget.tsx";
+import Decisions from "../src/pages/Decisions.tsx";
 import Capture from "../src/pages/Capture.tsx";
 import Gallery from "../src/pages/Gallery.tsx";
 import Home from "../src/pages/Home.tsx";
@@ -159,6 +160,7 @@ function Harness({ initial, spent, latest }: { initial: State; spent: { n: numbe
           <Route path="/" element={<Home />} />
           <Route path="/plan" element={<Zones />} />
           <Route path="/budget" element={<Budget />} />
+          <Route path="/decisions" element={<Decisions />} />
           <Route path="/gallery/:zoneId" element={<Gallery />} />
           <Route path="/zone/:zoneId" element={<Capture />} />
         </Routes>
@@ -274,8 +276,9 @@ describe("full-screen afters", () => {
     assert.equal(beforeOpen.getAttribute("aria-label"), "Before");
     assert.equal(buttonNamed("Like.", beforeOpen), undefined);
     assert.equal(buttonNamed("Dislike.", beforeOpen), undefined);
+    assert.equal(buttonNamed("Chat.", beforeOpen)?.textContent?.trim(), "Chat.");
     assert.equal(beforeOpen.querySelector(".after-count"), null);
-    for (const label of ["Approve.", "Remove.", "Edit.", "Generate.", "Hub.", "Chat."]) {
+    for (const label of ["Approve.", "Remove.", "Edit.", "Generate.", "Hub."]) {
       assert.equal(beforeOpen.textContent?.includes(label), false, label);
     }
     const beforeClose = buttonNamed("Close.", beforeOpen);
@@ -308,9 +311,10 @@ describe("full-screen afters", () => {
     assert.equal(buttonNamed("Close.", open)?.textContent?.trim(), "Close.");
     assert.equal(buttonNamed("Like.", open)?.textContent?.trim(), "Like.");
     assert.equal(buttonNamed("Dislike.", open)?.textContent?.trim(), "Dislike.");
+    assert.equal(buttonNamed("Chat.", open)?.textContent?.trim(), "Chat.");
     assert.equal(open.querySelector(".after-count"), null);
     assert.equal(open.querySelector("img")?.getAttribute("src"), "/esseboom/front-yard-after.svg");
-    for (const label of ["Approve.", "Remove.", "Edit.", "Generate.", "Hub.", "Chat."]) {
+    for (const label of ["Approve.", "Remove.", "Edit.", "Generate.", "Hub."]) {
       assert.equal(open.textContent?.includes(label), false, label);
     }
     assert.equal(session.spent.n, 0);
@@ -679,7 +683,7 @@ describe("spend phases", () => {
 
 describe("Hub. on the wordmark row", () => {
   it("opens https://apps.daup.co.za from Home, Zones, and Budget", async () => {
-    for (const path of ["/", "/plan", "/budget"]) {
+    for (const path of ["/", "/plan", "/budget", "/decisions"]) {
       await mount(path);
       const link = document.querySelector("a.hub");
       assert.ok(link, path);

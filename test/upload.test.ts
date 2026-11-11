@@ -46,12 +46,10 @@ describe("uploaded after", () => {
     assert.equal(next, state);
   });
 
-  it("warns on a small after and still keeps the picture", () => {
+  it("keeps a small after without a size note", () => {
     assert.ok(512 * 382 < ABOUT_ONE_MEGAPIXEL);
-    assert.equal(
-      copy.smallAfter(512, 382),
-      "This picture is small (512 × 382). It will look soft – use it anyway if that is what you have.",
-    );
+    assert.equal(JSON.stringify(copy).includes("512 × 382"), false);
+    assert.equal(JSON.stringify(copy).includes("This picture is small"), false);
     const state = seed();
     const next = reduce(state, {
       type: "upload-ok",
@@ -85,6 +83,17 @@ describe("uploaded after", () => {
     assert.equal(galleryRetryLabel(after?.attempts ?? 0, true), copy.edit);
     assert.equal(galleryRetryLabel(0, true), copy.edit);
     assert.equal(copy.edit, "Edit.");
+    const quiet = reduce(state, {
+      type: "upload-ok",
+      proposal: upload("zone_front", "up_quiet"),
+      description: "",
+      keep: [],
+      replace: [],
+    });
+    const quietLink = quiet.links.find((link) => link.zoneId === "zone_front");
+    assert.equal(quietLink?.readLine, "");
+    assert.equal(quietLink?.styleNote, "");
+    assert.equal(JSON.stringify(quiet).includes("We could not read this picture"), false);
   });
 
   it("removes an uploaded after without giving back or spending a try", () => {

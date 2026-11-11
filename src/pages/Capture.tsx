@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { copy } from "../copy";
 import { SUGGESTIONS, STYLE_CHIPS, TIER_CHIPS } from "../data/guides";
-import { ABOUT_ONE_MEGAPIXEL, capReached, triesLeft, type StyleId, type Tier } from "../lib/prompt";
+import { capReached, triesLeft, type StyleId, type Tier } from "../lib/prompt";
 import { canOfferAfterUpload } from "../lib/reading";
 import { TopBar } from "../components/Chrome";
 import { useZonePicker } from "../components/ZoneNav";
@@ -148,7 +148,6 @@ export default function Capture() {
   }
 
   const ready = Boolean(style && (style !== "custom" || styleNote.trim()) && budget && photos.length);
-  const small = photos.filter((photo) => photo.width * photo.height < ABOUT_ONE_MEGAPIXEL);
   const reading = busyZoneId === zoneId && busyMode === "read";
   const making = busyZoneId === zoneId && busyMode === "generate";
   const hasAfters = proposalsFor(state, currentPlan.id, zoneId).length > 0;
@@ -212,11 +211,6 @@ export default function Capture() {
       </div>
       {photos.some((photo) => photo.starred) ? <p className="meta">{copy.mainPhoto}</p> : null}
       {keepNote ? <p className="meta">{copy.keepBefore}</p> : null}
-      {small.map((photo) => (
-        <p key={photo.id} className="photo-warn" style={{ marginTop: 10 }}>
-          {copy.smallPhoto(photo.width, photo.height)}
-        </p>
-      ))}
       {photoError ? <p className="warn">{copy.photoRead}</p> : null}
       {photos.length >= PHOTO_CAP ? (
         <p className="meta">{copy.sixLimit}</p>
@@ -280,23 +274,6 @@ export default function Capture() {
           {copy.describe}
         </button>
       </div>
-      {style === "from-after" ? (
-        <label className="field">
-          <span className="eyebrow">{copy.whatWeRead}</span>
-          <textarea
-            className="read-line"
-            rows={3}
-            value={styleNote}
-            aria-label={copy.whatWeRead}
-            onChange={(event) => {
-              const text = event.target.value;
-              setStyleNote(text);
-              if (currentLink.styleFromZoneId) persist({ style: "from-after", styleNote: text });
-              else dispatch({ type: "set-read-line", planId: currentPlan.id, zoneId, text });
-            }}
-          />
-        </label>
-      ) : null}
       {style === "custom" ? (
         <label className="field">
           Your words

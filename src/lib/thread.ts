@@ -5,6 +5,18 @@ import { threadLeak } from "./leak";
 /** Questions are messages in the thread, not a person and not an assistant. */
 export const PROMPT_AUTHOR = "prompt";
 
+export function messageAuthorLabel(authorId: string, ownerId: string): string {
+  if (authorId === ownerId) return "You";
+  if (authorId === PROMPT_AUTHOR) return "Renovate";
+  return authorId;
+}
+
+export function messageClock(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" });
+}
+
 function promptId(zoneId: string, questionId: string): string {
   return `msg_${zoneId}_${questionId}`;
 }
@@ -75,6 +87,7 @@ export function postThreadMessage(
     text: string;
     createdAt: string;
     questionId?: string;
+    pictureId?: string;
   },
 ): State {
   const text = action.text.trim();
@@ -85,6 +98,7 @@ export function postThreadMessage(
     action.questionId && questionsFor(zone.key).some((question) => question.id === action.questionId)
       ? action.questionId
       : undefined;
+  const pictureId = !questionId && action.pictureId?.trim() ? action.pictureId.trim() : undefined;
   const messages = appendThreadMessage(state.messages, {
     id: action.id,
     zoneId: zone.id,
@@ -92,6 +106,7 @@ export function postThreadMessage(
     text,
     createdAt: action.createdAt,
     ...(questionId ? { questionId } : {}),
+    ...(pictureId ? { pictureId } : {}),
   });
   const zones = questionId
     ? state.zones.map((item) => {

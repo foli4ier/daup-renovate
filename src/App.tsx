@@ -3,6 +3,7 @@ import { copy } from "./copy";
 import { TabBar } from "./components/Chrome";
 import { useRenovate } from "./state/store";
 import Budget from "./pages/Budget";
+import Decisions from "./pages/Decisions";
 import Callout from "./pages/Callout";
 import Capture from "./pages/Capture";
 import Chat, { QuestionsRedirect } from "./pages/Chat";
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/zone/:zoneId/questions" element={<QuestionsRedirect />} />
         <Route path="/gallery/:zoneId" element={<Gallery />} />
         <Route path="/budget" element={<Budget />} />
+        <Route path="/decisions" element={<Decisions />} />
         <Route path="/work" element={<Work />} />
         <Route path="/callout" element={<Callout />} />
         <Route path="*" element={<Navigate to="/" replace />} />
