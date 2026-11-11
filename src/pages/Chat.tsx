@@ -3,7 +3,7 @@ import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-
 import { copy } from "../copy";
 import { questionsFor } from "../data/questions";
 import { threadLeak } from "../lib/leak";
-import { PROMPT_AUTHOR } from "../lib/thread";
+import { messageAuthorLabel, messageClock, PROMPT_AUTHOR } from "../lib/thread";
 import { TopBar } from "../components/Chrome";
 import { OpenPicture } from "../components/AfterViewer";
 import { useVisitZone } from "../components/ZoneNav";
@@ -13,12 +13,6 @@ import { useRenovate } from "../state/store";
 export function QuestionsRedirect() {
   const { zoneId = "" } = useParams();
   return <Navigate to={`/zone/${zoneId}/chat?from=capture`} replace />;
-}
-
-function messageTime(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" });
 }
 
 export default function Chat() {
@@ -82,7 +76,7 @@ export default function Chat() {
       <div className="thread" id="thread" role="log" aria-label={currentZone.name}>
         {messages.map((message) => {
           const mine = message.authorId === ownerId;
-          const label = mine ? "You" : message.authorId === PROMPT_AUTHOR ? null : message.authorId;
+          const label = messageAuthorLabel(message.authorId, ownerId);
           const chips =
             message.authorId === PROMPT_AUTHOR && message.questionId && message.chips && !answered.has(message.questionId)
               ? message.chips
@@ -90,8 +84,8 @@ export default function Chat() {
           return (
             <article key={message.id} className={mine ? "message mine" : "message"}>
               <p className="message-meta">
-                {label ? <span>{label}</span> : null}
-                <time dateTime={message.createdAt}>{messageTime(message.createdAt)}</time>
+                <span>{label}</span>
+                <time dateTime={message.createdAt}>{messageClock(message.createdAt)}</time>
               </p>
               <p className="message-text">{message.text}</p>
               {message.pictureId ? (

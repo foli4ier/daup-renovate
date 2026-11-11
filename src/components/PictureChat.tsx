@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { copy } from "../copy";
 import { threadLeak } from "../lib/leak";
+import { messageAuthorLabel, messageClock } from "../lib/thread";
 import { activeProperty } from "../state/select";
 import { useRenovate } from "../state/store";
 
@@ -36,14 +37,18 @@ export function PictureChat({ zoneId, pictureId, onClose }: { zoneId: string; pi
     <div className="picture-chat" role="dialog" aria-label={copy.chat}>
       <div className="picture-chat-log" role="log">
         {messages.map((message) => (
-          <p key={message.id} className="picture-chat-line">
-            {message.text}
-          </p>
+          <div key={message.id} className="picture-chat-line">
+            <p className="message-meta">
+              <span>{messageAuthorLabel(message.authorId, ownerId)}</span>
+              <time dateTime={message.createdAt}>{messageClock(message.createdAt)}</time>
+            </p>
+            <p className="message-text">{message.text}</p>
+          </div>
         ))}
       </div>
       {hint ? <p className="warn">{hint}</p> : null}
       <form
-        className="picture-chat-form"
+        className="composer-row picture-chat-form"
         onSubmit={(event) => {
           event.preventDefault();
           send();

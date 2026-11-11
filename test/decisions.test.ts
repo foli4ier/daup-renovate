@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { copy } from "../src/copy.ts";
 import { seed } from "../src/data/seed.ts";
-import { decisionDate, decisionMoves, summarizePictureChat } from "../src/lib/decisions.ts";
+import { decisionDate, decisionSheetMoves, summarizePictureChat } from "../src/lib/decisions.ts";
+import { messageAuthorLabel, PROMPT_AUTHOR } from "../src/lib/thread.ts";
 import { findLeak } from "../src/lib/leak.ts";
 import { readOwnerDocument } from "../src/state/persist.ts";
 import { reduce } from "../src/state/reducer.ts";
@@ -71,8 +72,28 @@ describe("picture chat decisions", () => {
     assert.equal(card?.column, "approved");
     assert.equal(card?.suggested, false);
     assert.equal(state.links.find((link) => link.zoneId === "zone_front")?.approvedProposalId, undefined);
-    assert.deepEqual(decisionMoves("approved"), ["rejected", "archived", "backlog"]);
-    assert.deepEqual(decisionMoves("backlog"), ["approved", "rejected", "archived"]);
+    assert.deepEqual(decisionSheetMoves("backlog"), [
+      { column: "approved", role: "primary" },
+      { column: "rejected", role: "outline" },
+      { column: "archived", role: "quiet" },
+    ]);
+    assert.deepEqual(decisionSheetMoves("approved"), [
+      { column: "backlog", role: "outline" },
+      { column: "rejected", role: "outline" },
+      { column: "archived", role: "quiet" },
+    ]);
+    assert.deepEqual(decisionSheetMoves("rejected"), [
+      { column: "approved", role: "primary" },
+      { column: "backlog", role: "outline" },
+      { column: "archived", role: "quiet" },
+    ]);
+    assert.deepEqual(decisionSheetMoves("archived"), [
+      { column: "approved", role: "primary" },
+      { column: "rejected", role: "outline" },
+      { column: "backlog", role: "outline" },
+    ]);
+    assert.equal(messageAuthorLabel("owner_you", "owner_you"), "You");
+    assert.equal(messageAuthorLabel(PROMPT_AUTHOR, "owner_you"), "Renovate");
     const priced = reduce(state, { type: "set-decision-line", planId: "plan_refresh", decisionId: id, line: "Budget R500." });
     assert.equal(priced.plans[0]?.decisions?.[0]?.line, card?.line);
   });

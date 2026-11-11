@@ -30,9 +30,23 @@ export function decisionDate(iso: string): string {
   return `${date.getUTCDate()} ${month} ${date.getUTCFullYear()}`;
 }
 
-export function decisionMoves(column: DecisionColumn): DecisionColumn[] {
-  const all: DecisionColumn[] = ["approved", "rejected", "archived", "backlog"];
-  return all.filter((item) => item !== column);
+export type DecisionMoveRole = "primary" | "outline" | "quiet";
+
+export type DecisionMove = { column: DecisionColumn; role: DecisionMoveRole };
+
+/**
+ * One terracotta primary (Approve.), one outline (Reject.), Archive. as a text link.
+ * On Approved, Rejected, or Archived, Back to backlog. is the outline control
+ * in place of the move for the column the card is already in.
+ */
+export function decisionSheetMoves(column: DecisionColumn): DecisionMove[] {
+  const slots: DecisionMove[] = [
+    { column: "approved", role: "primary" },
+    { column: "rejected", role: "outline" },
+    { column: "archived", role: "quiet" },
+  ];
+  if (column === "backlog") return slots;
+  return slots.map((slot) => (slot.column === column ? { column: "backlog", role: "outline" } : slot));
 }
 
 /** Fold one picture-chat message into a suggested backlog card. Does not approve a picture. */

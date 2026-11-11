@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { copy } from "../copy";
 import { Sheet, Wordmark } from "../components/Chrome";
-import { decisionDate, decisionMoves } from "../lib/decisions";
+import { decisionDate, decisionSheetMoves } from "../lib/decisions";
 import { activePlan } from "../state/select";
 import { useRenovate } from "../state/store";
 import type { Decision, DecisionColumn } from "../state/types";
@@ -21,6 +21,12 @@ const MOVE_LABEL: Record<DecisionColumn, string> = {
   rejected: copy.reject,
   archived: copy.archive,
   backlog: copy.backToBacklog,
+};
+
+const MOVE_CLASS: Record<"primary" | "outline" | "quiet", string> = {
+  primary: "btn btn-primary btn-wide",
+  outline: "btn btn-outline btn-wide",
+  quiet: "text-btn",
 };
 
 export default function Decisions() {
@@ -109,22 +115,30 @@ export default function Decisions() {
       {open ? (
         <Sheet
           title={state.zones.find((item) => item.id === open.zoneId)?.name ?? copy.decisions}
+          heading={
+            <span className="sheet-head">
+              <span>{state.zones.find((item) => item.id === open.zoneId)?.name ?? copy.decisions}</span>
+              <button className="back sheet-close" type="button" onClick={() => setOpenId(null)}>
+                {copy.close}
+              </button>
+            </span>
+          }
           onClose={() => setOpenId(null)}
           footer={
-            <div className="stack">
-              {decisionMoves(open.column).map((item) => (
+            <div className="decision-moves">
+              {decisionSheetMoves(open.column).map((move) => (
                 <button
-                  key={item}
-                  className="btn btn-primary btn-wide"
+                  key={move.column}
+                  className={MOVE_CLASS[move.role]}
                   type="button"
                   onClick={() => {
                     saveLine();
-                    dispatch({ type: "move-decision", planId: currentPlan.id, decisionId: open.id, column: item });
-                    setColumn(item);
+                    dispatch({ type: "move-decision", planId: currentPlan.id, decisionId: open.id, column: move.column });
+                    setColumn(move.column);
                     setOpenId(null);
                   }}
                 >
-                  {MOVE_LABEL[item]}
+                  {MOVE_LABEL[move.column]}
                 </button>
               ))}
             </div>
