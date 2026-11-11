@@ -73,11 +73,19 @@ export function StepRail({ pill }: { pill: Pill }) {
 
 export function TabBar() {
   const path = useLocation().pathname;
-  const current = path === "/" || path.startsWith("/properties") ? "home" : path === "/budget" ? "budget" : "zones";
+  const current =
+    path === "/" || path.startsWith("/properties")
+      ? "home"
+      : path.startsWith("/budget")
+        ? "budget"
+        : path.startsWith("/decisions")
+          ? "decisions"
+          : "zones";
   const tabs = [
     { id: "home", href: "/", label: "Home" },
     { id: "zones", href: "/plan", label: "Zones" },
     { id: "budget", href: "/budget", label: "Budget" },
+    { id: "decisions", href: "/decisions", label: "Decisions" },
   ] as const;
   return (
     <nav className="tabs" aria-label="App">

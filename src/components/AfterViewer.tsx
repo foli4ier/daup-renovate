@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { copy } from "../copy";
 import { isAfterViewerState, pointerGesture, stepIndex } from "../lib/afterView";
 import { BeforeAfter } from "./Chrome";
+import { PictureBar } from "./PictureBar";
+import { PictureChat } from "./PictureChat";
 
 export type AfterPicture = { id: string; imageUrl: string };
 
@@ -89,6 +91,8 @@ export function AfterViewer({
   label = "After",
   onClose,
   onMove,
+  onSheetClose,
+  sheet,
   children,
 }: {
   imageUrl: string;
@@ -97,6 +101,8 @@ export function AfterViewer({
   label?: string;
   onClose: () => void;
   onMove: (delta: number) => void;
+  onSheetClose?: () => void;
+  sheet?: ReactNode;
   children?: ReactNode;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -104,6 +110,8 @@ export function AfterViewer({
   const start = useRef<{ x: number; y: number; id: number } | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const onSheetCloseRef = useRef(onSheetClose);
+  onSheetCloseRef.current = onSheetClose;
 
   useEffect(() => {
     const root = document.getElementById("root");
@@ -115,6 +123,10 @@ export function AfterViewer({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
+        if (onSheetCloseRef.current) {
+          onSheetCloseRef.current();
+          return;
+        }
         onCloseRef.current();
         return;
       }
@@ -200,8 +212,47 @@ export function AfterViewer({
       ) : (
         count
       )}
+      {sheet}
     </div>,
     document.body,
+  );
+}
+
+export function OpenPicture({
+  kind,
+  planId,
+  zoneId,
+  pictureId,
+  imageUrl,
+  place,
+  total,
+  onClose,
+  onMove,
+}: {
+  kind: "before" | "after";
+  planId: string;
+  zoneId: string;
+  pictureId: string;
+  imageUrl: string;
+  place: number;
+  total: number;
+  onClose: () => void;
+  onMove: (delta: number) => void;
+}) {
+  const [chat, setChat] = useState(false);
+  return (
+    <AfterViewer
+      label={kind === "before" ? "Before" : "After"}
+      imageUrl={imageUrl}
+      place={place}
+      total={total}
+      onClose={onClose}
+      onMove={onMove}
+      onSheetClose={chat ? () => setChat(false) : undefined}
+      sheet={chat ? <PictureChat zoneId={zoneId} pictureId={pictureId} onClose={onClose} /> : null}
+    >
+      <PictureBar kind={kind} planId={planId} zoneId={zoneId} pictureId={pictureId} onChat={() => setChat(true)} />
+    </AfterViewer>
   );
 }
 
@@ -213,7 +264,8 @@ export function GalleryStage({
   selectedId,
   onSelect,
   empty,
-  afterFooter,
+  planId,
+  zoneId,
 }: {
   befores: AfterPicture[];
   beforeId?: string;
@@ -222,7 +274,8 @@ export function GalleryStage({
   selectedId?: string;
   onSelect: (id: string) => void;
   empty: ReactNode;
-  afterFooter?: ReactNode;
+  planId?: string;
+  zoneId?: string;
 }) {
   const beforeReel = useReel("beforeViewer", befores, beforeId, onSelectBefore);
   const afterReel = useAfterLightbox(pictures, selectedId, onSelect);
@@ -246,9 +299,12 @@ export function GalleryStage({
           empty
         )}
       </div>
-      {beforeReel.open && before ? (
-        <AfterViewer
-          label="Before"
+      {beforeReel.open && before && planId && zoneId ? (
+        <OpenPicture
+          kind="before"
+          planId={planId}
+          zoneId={zoneId}
+          pictureId={before.id}
           imageUrl={before.imageUrl}
           place={beforeReel.index + 1}
           total={befores.length}
@@ -256,17 +312,18 @@ export function GalleryStage({
           onMove={beforeReel.move}
         />
       ) : null}
-      {afterReel.open && current ? (
-        <AfterViewer
-          label="After"
+      {afterReel.open && current && planId && zoneId ? (
+        <OpenPicture
+          kind="after"
+          planId={planId}
+          zoneId={zoneId}
+          pictureId={current.id}
           imageUrl={current.imageUrl}
           place={afterReel.index + 1}
           total={pictures.length}
           onClose={afterReel.closeViewer}
           onMove={afterReel.move}
-        >
-          {afterFooter}
-        </AfterViewer>
+        />
       ) : null}
     </>
   );

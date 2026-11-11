@@ -75,6 +75,7 @@ export function postThreadMessage(
     text: string;
     createdAt: string;
     questionId?: string;
+    pictureId?: string;
   },
 ): State {
   const text = action.text.trim();
@@ -85,6 +86,7 @@ export function postThreadMessage(
     action.questionId && questionsFor(zone.key).some((question) => question.id === action.questionId)
       ? action.questionId
       : undefined;
+  const pictureId = !questionId && action.pictureId?.trim() ? action.pictureId.trim() : undefined;
   const messages = appendThreadMessage(state.messages, {
     id: action.id,
     zoneId: zone.id,
@@ -92,6 +94,7 @@ export function postThreadMessage(
     text,
     createdAt: action.createdAt,
     ...(questionId ? { questionId } : {}),
+    ...(pictureId ? { pictureId } : {}),
   });
   const zones = questionId
     ? state.zones.map((item) => {

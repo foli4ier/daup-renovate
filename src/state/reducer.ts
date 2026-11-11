@@ -6,9 +6,11 @@ import { defaultZones } from "../data/zones";
 import { withSharedLook } from "../lib/look";
 import type { StyleId, Tier } from "../lib/prompt";
 import { canOfferAfterUpload } from "../lib/reading";
+import { suggestFromPictureChat } from "../lib/decisions";
+import { findLeak } from "../lib/leak";
 import { keepSpendZoneIds, placePhaseZones } from "../lib/spend";
 import { postThreadMessage, seedZoneThread } from "../lib/thread";
-import { emptyLink, withMessages, type CalloutRequest, type Photo, type Plan, type Proposal, type ReactionKind, type SpendPhase, type State, type Zone, type ZoneKind } from "./types";
+import { emptyLink, withMessages, type CalloutRequest, type DecisionColumn, type Photo, type Plan, type Proposal, type ReactionKind, type SpendPhase, type State, type Zone, type ZoneKind } from "./types";
 
 const PHOTO_CAP = 6;
 
@@ -49,7 +51,10 @@ export type Action =
       text: string;
       createdAt: string;
       questionId?: string;
+      pictureId?: string;
     }
+  | { type: "set-decision-line"; planId: string; decisionId: string; line: string }
+  | { type: "move-decision"; planId: string; decisionId: string; column: DecisionColumn }
   | { type: "approve"; planId: string; zoneId: string; proposalId: string }
   | { type: "skip-zone"; planId: string; zoneId: string }
   | { type: "move-phase"; planId: string; phaseId: string; direction: "up" | "down" }
@@ -395,8 +400,40 @@ export function reduce(state: State, action: Action): State {
     }
     case "seed-thread":
       return seedZoneThread(state, action.zoneId, action.ownerId, action.now);
-    case "post-message":
-      return postThreadMessage(state, action);
+    case "post-message": {
+      const next = postThreadMessage(state, action);
+      if (next === state || !action.pictureId) return next;
+      return suggestFromPictureChat(next, { zoneId: action.zoneId, pictureId: action.pictureId, messageId: action.id });
+    }
+    case "set-decision-line": {
+      const line = action.line.replace(/\s+/g, " ").trim();
+      if (!line || findLeak(line)) return state;
+      return {
+        ...state,
+        plans: state.plans.map((plan) => {
+          if (plan.id !== action.planId) return plan;
+          return {
+            ...plan,
+            decisions: (plan.decisions ?? []).map((item) =>
+              item.id === action.decisionId ? { ...item, line, edited: true } : item,
+            ),
+          };
+        }),
+      };
+    }
+    case "move-decision":
+      return {
+        ...state,
+        plans: state.plans.map((plan) => {
+          if (plan.id !== action.planId) return plan;
+          return {
+            ...plan,
+            decisions: (plan.decisions ?? []).map((item) =>
+              item.id === action.decisionId ? { ...item, column: action.column, suggested: false } : item,
+            ),
+          };
+        }),
+      };
     case "generate-ok":
       return {
         ...state,

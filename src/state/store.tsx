@@ -14,9 +14,9 @@ import { unmatchedHouseName } from "../lib/properties";
 import { locateLeak, type LeakSpot } from "../lib/leak";
 import { assessTotal } from "../lib/budget";
 import { SUGGESTIONS } from "../data/guides";
-import { capReached, type StyleId, type Tier } from "../lib/prompt";
+import { ABOUT_ONE_MEGAPIXEL, capReached, type StyleId, type Tier } from "../lib/prompt";
 import { fitPictureForHouse } from "../lib/pictureFit";
-import { canOfferAfterUpload, READ_FALLBACK } from "../lib/reading";
+import { canOfferAfterUpload } from "../lib/reading";
 import { readSyncMarks, SYNC_KEY, syncHousePlans, type SyncMarks, type SyncResult } from "./houseSync";
 import { isEffectivelyEmpty, planFingerprint, sliceProperty } from "./slice";
 import { hasPictureRefs, loadOwner, readStoredOwner, saveOwner } from "./persist";
@@ -418,7 +418,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             width: photo.width,
             height: photo.height,
           },
-          description: reading.ok ? reading.reading.description : READ_FALLBACK,
+          description: reading.ok ? reading.reading.description : "",
           keep: reading.ok ? reading.reading.keep : [],
           replace: reading.ok ? reading.reading.replace : [],
         });
@@ -473,6 +473,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             imageUrl: result.imageUrl,
             createdAt: new Date().toISOString(),
             source: "generated",
+            softBefore: photo.width * photo.height < ABOUT_ONE_MEGAPIXEL,
           },
         });
         return { ok: true, proposalId };

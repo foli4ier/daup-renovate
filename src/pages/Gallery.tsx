@@ -6,47 +6,9 @@ import { GalleryStage } from "../components/AfterViewer";
 import { ActionBar, Sheet, TopBar } from "../components/Chrome";
 import { useZonePicker } from "../components/ZoneNav";
 import { whatChanges } from "../lib/changes";
-import { ABOUT_ONE_MEGAPIXEL, triesLeft } from "../lib/prompt";
-import { nextReaction, reactionLines } from "../lib/spend";
-import { activePlan, activeProperty, linkFor, photosFor, proposalsFor, starredPhoto } from "../state/select";
+import { triesLeft } from "../lib/prompt";
+import { activePlan, linkFor, photosFor, proposalsFor, starredPhoto } from "../state/select";
 import { useRenovate } from "../state/store";
-import type { ReactionKind } from "../state/types";
-
-function AfterReactions({ planId, zoneId, proposalId }: { planId: string; zoneId: string; proposalId: string }) {
-  const { state, dispatch } = useRenovate();
-  const viewerId = activeProperty(state)?.ownerId ?? "";
-  const proposal = state.proposals.find((item) => item.id === proposalId && item.planId === planId && item.zoneId === zoneId);
-  const lines = reactionLines(proposal?.reactions, viewerId);
-  const mine = proposal?.reactions?.find((item) => item.personId === viewerId);
-
-  function tap(kind: ReactionKind) {
-    if (!viewerId || !proposal) return;
-    dispatch({
-      type: "set-reaction",
-      planId,
-      zoneId,
-      proposalId: proposal.id,
-      personId: viewerId,
-      name: mine?.name ?? "",
-      kind: nextReaction(mine?.kind, kind),
-    });
-  }
-
-  return (
-    <div className="after-reactions">
-      <div className="reaction-row">
-        <button className="btn btn-outline" type="button" aria-pressed={mine?.kind === "like"} onClick={() => tap("like")}>
-          {copy.like}
-        </button>
-        <button className="btn btn-outline" type="button" aria-pressed={mine?.kind === "dislike"} onClick={() => tap("dislike")}>
-          {copy.dislike}
-        </button>
-      </div>
-      {lines.liked ? <p className="reaction-names">{lines.liked}</p> : null}
-      {lines.disliked ? <p className="reaction-names">{lines.disliked}</p> : null}
-    </div>
-  );
-}
 
 export default function Gallery() {
   const { zoneId = "" } = useParams();
@@ -88,11 +50,7 @@ export default function Gallery() {
   const hasUpload = pictures.some((item) => item.source === "uploaded");
   const showingUploaded = current?.source === "uploaded";
   const fromZone = link?.styleFromZoneId ? state.zones.find((item) => item.id === link.styleFromZoneId) : undefined;
-  const changes = link ? whatChanges({ read: link.readLine, keep: link.keep, replace: link.replace }) : [];
-  const smallAfter =
-    showingUploaded && current?.width && current?.height && current.width * current.height < ABOUT_ONE_MEGAPIXEL
-      ? copy.smallAfter(current.width, current.height)
-      : "";
+  const changes = link ? whatChanges({ keep: link.keep, replace: link.replace }) : [];
   const showingApproved = Boolean(current && link?.approvedProposalId === current.id);
 
   function saveKeepAndOpenCapture() {
@@ -147,27 +105,39 @@ export default function Gallery() {
         selectedId={current?.id}
         onSelect={setPicked}
         empty={link?.lastFailed ? <p className="warn">{copy.failure}</p> : <div className="ph">No picture yet</div>}
-        afterFooter={zone && current ? <AfterReactions planId={currentPlan.id} zoneId={zone.id} proposalId={current.id} /> : null}
+        planId={currentPlan.id}
+        zoneId={zone?.id}
       />
-      {smallAfter ? (
-        <p className="photo-warn" style={{ marginTop: 10 }}>
-          {smallAfter}
-        </p>
+      {current?.softBefore ? <p className="meta">{copy.softBefore}</p> : null}
+      {zone ? (
+        <div className="photo-row" id="proposal-thumbs" style={{ marginTop: 12 }}>
+          {pictures.map((picture) => {
+            const selected = picture.id === current?.id;
+            return (
+              <div key={picture.id} className={selected ? "thumb after-thumb selected" : "thumb after-thumb"}>
+                <button
+                  type="button"
+                  className="thumb-pick"
+                  aria-pressed={selected}
+                  onClick={() => setPicked(picture.id)}
+                >
+                  <img src={picture.imageUrl} alt={picture.source === "uploaded" ? "Uploaded after" : "Generated after"} />
+                </button>
+                {selected ? (
+                  <button className="text-btn" type="button" onClick={() => removeAfter(picture.id)}>
+                    {copy.remove}
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+          <button id="add-after" className="thumb add-tile" type="button" onClick={() => navigate(`/zone/${zone.id}`)}>
+            {copy.addAfter}
+          </button>
+        </div>
       ) : null}
       {hasUpload && zone && link ? (
         <>
-          <label className="field" htmlFor="what-we-read">
-            <span className="eyebrow">{copy.whatWeRead}</span>
-            <textarea
-              id="what-we-read"
-              className="read-line"
-              rows={3}
-              value={link.readLine ?? ""}
-              onChange={(event) =>
-                dispatch({ type: "set-read-line", planId: currentPlan.id, zoneId: zone.id, text: event.target.value })
-              }
-            />
-          </label>
           <button
             id="share-look"
             className="choice"
@@ -198,33 +168,6 @@ export default function Gallery() {
             ))}
           </ul>
         </>
-      ) : null}
-      {zone ? (
-        <div className="photo-row" id="proposal-thumbs" style={{ marginTop: 12 }}>
-          {pictures.map((picture) => {
-            const selected = picture.id === current?.id;
-            return (
-              <div key={picture.id} className={selected ? "thumb after-thumb selected" : "thumb after-thumb"}>
-                <button
-                  type="button"
-                  className="thumb-pick"
-                  aria-pressed={selected}
-                  onClick={() => setPicked(picture.id)}
-                >
-                  <img src={picture.imageUrl} alt={picture.source === "uploaded" ? "Uploaded after" : "Generated after"} />
-                </button>
-                {selected ? (
-                  <button className="text-btn" type="button" onClick={() => removeAfter(picture.id)}>
-                    {copy.remove}
-                  </button>
-                ) : null}
-              </div>
-            );
-          })}
-          <button id="add-after" className="thumb add-tile" type="button" onClick={() => navigate(`/zone/${zone.id}`)}>
-            {copy.addAfter}
-          </button>
-        </div>
       ) : null}
       {zone && link && !driftOpen ? (
         <div className="quiet-pair" id="gallery-actions">
