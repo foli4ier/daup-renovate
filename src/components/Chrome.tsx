@@ -118,6 +118,9 @@ export function Sheet({
   footer?: ReactNode;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  // Focus once. onClose is a new function on each parent render, and re-running this steals the field.
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const root = dialogRef.current;
@@ -129,7 +132,7 @@ export function Sheet({
     initial?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
@@ -154,7 +157,7 @@ export function Sheet({
       document.removeEventListener("keydown", onKey);
       previous?.focus();
     };
-  }, [onClose]);
+  }, []);
   return (
     <div className="backdrop" onClick={onClose}>
       <div

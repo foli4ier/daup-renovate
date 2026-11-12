@@ -7,6 +7,33 @@ import { activeProperty, propertyZones } from "../state/select";
 import { useRenovate } from "../state/store";
 import type { Zone, ZoneKind } from "../state/types";
 
+function sizeText(raw: string, size: number): string {
+  if (/^\d+\.$/.test(raw) || /^\d+\.\d*0$/.test(raw)) return raw;
+  return String(size);
+}
+
+function SizeField({ sizeM2, onSize }: { sizeM2?: number; onSize: (sizeM2?: number) => void }) {
+  const [text, setText] = useState(sizeM2 === undefined ? "" : String(sizeM2));
+  return (
+    <input
+      inputMode="decimal"
+      value={text}
+      onChange={(event) => {
+        const raw = event.target.value.trim();
+        if (!raw) {
+          setText("");
+          onSize(undefined);
+          return;
+        }
+        const size = Number(raw);
+        if (!Number.isFinite(size) || size <= 0) return;
+        setText(sizeText(raw, size));
+        onSize(size);
+      }}
+    />
+  );
+}
+
 export function EditZones({ onClose }: { onClose: () => void }) {
   const { state, dispatch } = useRenovate();
   const property = activeProperty(state);
@@ -110,18 +137,9 @@ export function EditZones({ onClose }: { onClose: () => void }) {
                   </div>
                   <label className="field">
                     Size in m²
-                    <input
-                      inputMode="decimal"
-                      value={zone.sizeM2 ?? ""}
-                      onChange={(event) => {
-                        const raw = event.target.value.trim();
-                        if (!raw) {
-                          dispatch({ type: "set-zone-size", zoneId: zone.id });
-                          return;
-                        }
-                        const size = Number(raw);
-                        if (Number.isFinite(size) && size > 0) dispatch({ type: "set-zone-size", zoneId: zone.id, sizeM2: size });
-                      }}
+                    <SizeField
+                      sizeM2={zone.sizeM2}
+                      onSize={(sizeM2) => dispatch({ type: "set-zone-size", zoneId: zone.id, sizeM2 })}
                     />
                   </label>
                   <div className="row">
